@@ -28,9 +28,9 @@ class PWNode{
 public:
 	int index = -1;
 	AABB aabb;
-	AABB acceptedAABB;
+	AABB acceptedAABB; //??
 	int level = 0;
-	SparseGrid *grid;
+	SparseGrid *grid;//稀疏网格
 	unsigned int numAccepted = 0;
 	PWNode *parent = NULL;
 	vector<PWNode*> children;
@@ -70,22 +70,24 @@ public:
 
 	string workDir();
 
+	//分层路径
 	string hierarchyPath();
 
 	string path();
 
 	void flush();
 
+	//穿过; 横贯
 	void traverse(std::function<void(PWNode*)> callback);
-
+	//广度优先
 	void traverseBreadthFirst(std::function<void(PWNode*)> callback);
 
+	//获取分层
 	vector<PWNode*> getHierarchy(int levels);
 
 	PWNode* findNode(string name);
 
 private:
-
 	PointReader *createReader(string path);
 	PointWriter *createWriter(string path);
 
@@ -107,15 +109,15 @@ public:
 	long long numAdded = 0;
 	long long numAccepted = 0;
 	CloudJS cloudjs;
-	OutputFormat outputFormat;
-	PointAttributes pointAttributes;
-	int hierarchyStepSize = 5;
-	vector<Point> store;
-	thread storeThread;
+	OutputFormat outputFormat;   //转出格式
+	PointAttributes pointAttributes;//点的属性
+	int hierarchyStepSize = 5;  //设置的分层数目
+	vector<Point> store;  //存储点的数组？？
+	thread storeThread;  //存储的线程
 	int pointsInMemory = 0;
 	string projection = "";
-	ConversionQuality quality = ConversionQuality::DEFAULT;
-	int storeSize = 20'000;
+	ConversionQuality quality = ConversionQuality::DEFAULT; //转换的质量
+	int storeSize = 20'000; //?每个文件2万个点？
 
 
 	PotreeWriter(string workDir, ConversionQuality quality);

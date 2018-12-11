@@ -21,7 +21,7 @@ using std::max;
 namespace Potree{
 
 #define MAX_FLOAT std::numeric_limits<float>::max()
-
+//稀疏的网格
 class SparseGrid : public unordered_map<long long, GridCell*>{
 public:
 	int width;

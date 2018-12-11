@@ -14,7 +14,7 @@ namespace Potree{
 
 class SparseGrid;
 
-
+//网格结构
 class GridCell{
 public:
 	vector<Vector3<double> > points;

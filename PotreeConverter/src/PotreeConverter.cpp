@@ -49,26 +49,39 @@ namespace fs = std::experimental::filesystem;
 
 namespace Potree{
 
-PointReader *PotreeConverter::createPointReader(string path, PointAttributes pointAttributes){
+PointReader *PotreeConverter::createPointReader(string path, PointAttributes pointAttributes)
+{
 	PointReader *reader = NULL;
-	if(iEndsWith(path, ".las") || iEndsWith(path, ".laz")){
+	if(iEndsWith(path, ".las") || iEndsWith(path, ".laz"))
+	{
 		reader = new LASPointReader(path);
-	}else if(iEndsWith(path, ".ptx")){
+	}
+	else if(iEndsWith(path, ".ptx"))
+	{
 		reader = new PTXPointReader(path);
-	}else if(iEndsWith(path, ".ply")){
+	}
+	else if(iEndsWith(path, ".ply"))
+	{
 		reader = new PlyPointReader(path);
-	}else if(iEndsWith(path, ".xyz") || iEndsWith(path, ".txt")){
+	}
+	else if(iEndsWith(path, ".xyz") || iEndsWith(path, ".txt"))
+	{
 		reader = new XYZPointReader(path, format, colorRange, intensityRange);
-	}else if(iEndsWith(path, ".pts")){
+	}
+	else if(iEndsWith(path, ".pts"))
+	{
 		vector<double> intensityRange;
 
-		if(this->intensityRange.size() == 0){
+		if(this->intensityRange.size() == 0)
+		{
 				intensityRange.push_back(-2048);
 				intensityRange.push_back(+2047);
 		}
 
 		reader = new XYZPointReader(path, format, colorRange, intensityRange);
- 	}else if(iEndsWith(path, ".bin")){
+ 	}
+ 	else if(iEndsWith(path, ".bin"))
+ 	{
 		reader = new BINPointReader(path, aabb, scale, pointAttributes);
 	}
 
@@ -81,29 +94,38 @@ PotreeConverter::PotreeConverter(string executablePath, string workDir, vector<s
 	this->sources = sources;
 }
 
-void PotreeConverter::prepare(){
-
+//遍历文件存储至this->sources
+//遍历属性，存储至this->pointAttributes
+void PotreeConverter::prepare()
+{
 	// if sources contains directories, use files inside the directory instead
 	vector<string> sourceFiles;
-	for (const auto &source : sources) {
+	for (const auto &source : sources)
+	{
 		fs::path pSource(source);
-		if(fs::is_directory(pSource)){
+		if(fs::is_directory(pSource))
+		{
 			fs::directory_iterator it(pSource);
-			for(;it != fs::directory_iterator(); it++){
+			for(;it != fs::directory_iterator(); it++)
+			{
 				fs::path pDirectoryEntry = it->path();
-				if(fs::is_regular_file(pDirectoryEntry)){
+				if(fs::is_regular_file(pDirectoryEntry))
+				{
 					string filepath = pDirectoryEntry.string();
 					if(iEndsWith(filepath, ".las")
 						|| iEndsWith(filepath, ".laz")
 						|| iEndsWith(filepath, ".xyz")
 						|| iEndsWith(filepath, ".pts")
 						|| iEndsWith(filepath, ".ptx")
-						|| iEndsWith(filepath, ".ply")){
-						sourceFiles.push_back(filepath);
-					}
+						|| iEndsWith(filepath, ".ply"))
+						{
+							sourceFiles.push_back(filepath);
+						}
 				}
 			}
-		}else if(fs::is_regular_file(pSource)){
+		}
+		else if(fs::is_regular_file(pSource))
+		{
 			sourceFiles.push_back(source);
 		}
 	}
@@ -111,38 +133,57 @@ void PotreeConverter::prepare(){
 
 	pointAttributes = PointAttributes();
 	pointAttributes.add(PointAttribute::POSITION_CARTESIAN);
-	for(const auto &attribute : outputAttributes){
-		if(attribute == "RGB"){
+	for(const auto &attribute : outputAttributes)
+	{
+		if(attribute == "RGB")
+		{
 			pointAttributes.add(PointAttribute::COLOR_PACKED);
-		}else if(attribute == "INTENSITY"){
+		}
+		else if(attribute == "INTENSITY")
+		{
 			pointAttributes.add(PointAttribute::INTENSITY);
-		} else if (attribute == "CLASSIFICATION") {
+		}
+		else if (attribute == "CLASSIFICATION")
+		 {
 			pointAttributes.add(PointAttribute::CLASSIFICATION);
-		} else if (attribute == "RETURN_NUMBER") {
+		}
+		 else if (attribute == "RETURN_NUMBER")
+		{
 			pointAttributes.add(PointAttribute::RETURN_NUMBER);
-		} else if (attribute == "NUMBER_OF_RETURNS") {
+		}
+		else if (attribute == "NUMBER_OF_RETURNS")
+		{
 			pointAttributes.add(PointAttribute::NUMBER_OF_RETURNS);
-		} else if (attribute == "SOURCE_ID") {
+		}
+		else if (attribute == "SOURCE_ID")
+		{
 			pointAttributes.add(PointAttribute::SOURCE_ID);
-		} else if (attribute == "GPS_TIME") {
+		}
+		else if (attribute == "GPS_TIME")
+		{
 			pointAttributes.add(PointAttribute::GPS_TIME);
-		} else if(attribute == "NORMAL"){
+		}
+		else if(attribute == "NORMAL")
+		{
 			pointAttributes.add(PointAttribute::NORMAL_OCT16);
 		}
 	}
 }
 
-AABB PotreeConverter::calculateAABB(){
+AABB PotreeConverter::calculateAABB()
+{
 	AABB aabb;
-	if(aabbValues.size() == 6){
+	if(aabbValues.size() == 6)
+	{
 		Vector3<double> userMin(aabbValues[0],aabbValues[1],aabbValues[2]);
 		Vector3<double> userMax(aabbValues[3],aabbValues[4],aabbValues[5]);
 		aabb = AABB(userMin, userMax);
-	}else{
-		for(string source : sources){
-
+	}
+	else
+	{
+		for(string source : sources)
+		{
 			PointReader *reader = createPointReader(source, pointAttributes);
-
 			AABB lAABB = reader->getAABB();
 			aabb.update(lAABB.min);
 			aabb.update(lAABB.max);
@@ -263,17 +304,20 @@ void PotreeConverter::generatePage(string name){
 	//}
 }
 
-void writeSources(string path, vector<string> sourceFilenames, vector<int> numPoints, vector<AABB> boundingBoxes, string projection){
+//生成Json文件，记录了【点数】
+void writeSources(string path, vector<string> sourceFilenames, vector<int> numPoints, vector<AABB> boundingBoxes, string projection)
+{
 	Document d(rapidjson::kObjectType);
 
 	AABB bb;
-
 
 	Value jProjection(projection.c_str(), (rapidjson::SizeType)projection.size());
 
 	Value jSources(rapidjson::kObjectType);
 	jSources.SetArray();
-	for(int i = 0; i < sourceFilenames.size(); i++){
+
+	for(int i = 0; i < sourceFilenames.size(); i++)
+	{
 		string &source = sourceFilenames[i];
 		int points = numPoints[i];
 		AABB boundingBox = boundingBoxes[i];
@@ -349,9 +393,11 @@ void writeSources(string path, vector<string> sourceFilenames, vector<int> numPo
 	sourcesOut.close();
 }
 
-void PotreeConverter::convert(){
+void PotreeConverter::convert()
+{
 	auto start = high_resolution_clock::now();
 
+	//准备工作，获取多个文件的属性字段 ；遍历文件存储至this->sources
 	prepare();
 
 	long long pointsProcessed = 0;
@@ -361,44 +407,58 @@ void PotreeConverter::convert(){
 	aabb.makeCubic();
 	cout << "cubic AABB: " << endl << aabb << endl;
 
-	if (diagonalFraction != 0) {
+	//对角因子diagonalFraction若不等于0 则算出间距spacing  疑似与密度有关
+	if (diagonalFraction != 0)
+	{
 		spacing = (float)(aabb.size.length() / diagonalFraction);
 		cout << "spacing calculated from diagonal: " << spacing << endl;
 	}
 
-	if(pageName.size() > 0){
+	//根据模板产生并修改HTML文件
+	if(pageName.size() > 0)
+	{
 		generatePage(pageName);
 		workDir = workDir + "/pointclouds/" + pageName;
 	}
 
 	PotreeWriter *writer = NULL;
-	if(fs::exists(fs::path(this->workDir + "/cloud.js"))){
-
-		if(storeOption == StoreOption::ABORT_IF_EXISTS){
+	if(fs::exists(fs::path(this->workDir + "/cloud.js"))) //若之前已经生成过了文件，则有三种方式
+	{
+		//若存在则取消
+		if(storeOption == StoreOption::ABORT_IF_EXISTS)
+		{
 			cout << "ABORTING CONVERSION: target already exists: " << this->workDir << "/cloud.js" << endl;
 			cout << "If you want to overwrite the existing conversion, specify --overwrite" << endl;
 			cout << "If you want add new points to the existing conversion, make sure the new points ";
 			cout << "are contained within the bounding box of the existing conversion and then specify --incremental" << endl;
 
 			return;
-		}else if(storeOption == StoreOption::OVERWRITE){
+		}
+		//覆盖重写
+		else if(storeOption == StoreOption::OVERWRITE)
+		{
 			fs::remove_all(workDir + "/data");
 			fs::remove_all(workDir + "/temp");
 			fs::remove(workDir + "/cloud.js");
 			writer = new PotreeWriter(this->workDir, aabb, spacing, maxDepth, scale, outputFormat, pointAttributes, quality);
 			writer->setProjection(this->projection);
-		}else if(storeOption == StoreOption::INCREMENTAL){
+		}
+		//增加的
+		else if(storeOption == StoreOption::INCREMENTAL)
+		{
 			writer = new PotreeWriter(this->workDir, quality);
 			writer->loadStateFromDisk();
 		}
-	}else{
+	}
+	else
+	{
+        //workDir: 输出目录----aabb：包围盒子----spacing：距离
 		writer = new PotreeWriter(this->workDir, aabb, spacing, maxDepth, scale, outputFormat, pointAttributes, quality);
 		writer->setProjection(this->projection);
 	}
 
-	if(writer == NULL){
+	if(writer == NULL)
 		return;
-	}
 
 	writer->storeSize = storeSize;
 
@@ -406,7 +466,8 @@ void PotreeConverter::convert(){
 	vector<int> numPoints;
 	vector<string> sourceFilenames;
 
-	for (const auto &source : sources) {
+	for (const auto &source : sources)
+	{
 		cout << "READING:  " << source << endl;
 
 		PointReader *reader = createPointReader(source, pointAttributes);
@@ -415,21 +476,27 @@ void PotreeConverter::convert(){
 		numPoints.push_back(reader->numPoints());
 		sourceFilenames.push_back(fs::path(source).filename().string());
 
+		//很奇怪，数组还没有加进去就写文件
 		writeSources(this->workDir, sourceFilenames, numPoints, boundingBoxes, this->projection);
-		if(this->sourceListingOnly){
+
+		//如果只有一个数据格式？   一般都是false
+		if(this->sourceListingOnly)
+		{
 			reader->close();
 			delete reader;
-
 			continue;
 		}
 
-		while(reader->readNextPoint()){
+		while(reader->readNextPoint())
+		{
 			pointsProcessed++;
 
 			Point p = reader->getPoint();
 			writer->add(p);
 
-			if((pointsProcessed % (1'000'000)) == 0){
+			//每隔100万个点，统计一下时间和进度
+			if((pointsProcessed % (1'000'000)) == 0)
+			{
 				writer->processStore();
 				writer->waitUntilProcessed();
 
@@ -447,7 +514,8 @@ void PotreeConverter::convert(){
 
 				cout << ssMessage.str() << endl;
 			}
-			if((pointsProcessed % (flushLimit)) == 0){
+			if((pointsProcessed % (flushLimit)) == 0)
+			{
 				cout << "FLUSHING: ";
 
 				auto start = high_resolution_clock::now();
@@ -460,15 +528,9 @@ void PotreeConverter::convert(){
 
 				cout << seconds << "s" << endl;
 			}
-
-			//if(pointsProcessed >= 10'000'000){
-			//	break;
-			//}
 		}
 		reader->close();
 		delete reader;
-
-
 	}
 
 	cout << "closing writer" << endl;

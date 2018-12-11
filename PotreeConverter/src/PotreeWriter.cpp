@@ -511,7 +511,7 @@ string PotreeWriter::getExtension(){
 
 	return "";
 }
-
+//joinable状态下，只有当你调用了pthread_join之后这些资源才会被释放，这是需要调用pthread_join函数。
 void PotreeWriter::waitUntilProcessed(){
 	if(storeThread.joinable()){
 		storeThread.join();
@@ -539,19 +539,23 @@ void PotreeWriter::processStore(){
 	vector<Point> st = store;
 	store = vector<Point>();
 
-	waitUntilProcessed();
-
-	storeThread = thread([this, st]{
-		for(Point p : st){
-			PWNode *acceptedBy = root->add(p);
-			if(acceptedBy != NULL){
-				tightAABB.update(p.position);
-
-				pointsInMemory++;
-				numAccepted++;
+	waitUntilProcessed(); //释放内存
+	//匿名函数作为参数
+	storeThread = thread(
+		[this, st]
+		{
+			for(Point p : st)
+			{
+				PWNode *acceptedBy = root->add(p);
+				if(acceptedBy != NULL)
+				{
+					tightAABB.update(p.position);
+					pointsInMemory++;
+					numAccepted++;
+				}
 			}
 		}
-	});
+	);
 }
 
 void PotreeWriter::flush(){
