@@ -35,13 +35,15 @@ namespace fs = std::experimental::filesystem;
 
 namespace Potree{
 
-PWNode::PWNode(PotreeWriter* potreeWriter, AABB aabb){
+PWNode::PWNode(PotreeWriter* potreeWriter, AABB aabb)
+{
 	this->potreeWriter = potreeWriter;
 	this->aabb = aabb;
 	this->grid = new SparseGrid(aabb, spacing());
 }
 
-PWNode::PWNode(PotreeWriter* potreeWriter, int index, AABB aabb, int level){
+PWNode::PWNode(PotreeWriter* potreeWriter, int index, AABB aabb, int level)
+{
 	this->index = index;
 	this->aabb = aabb;
 	this->level = level;
@@ -49,83 +51,104 @@ PWNode::PWNode(PotreeWriter* potreeWriter, int index, AABB aabb, int level){
 	this->grid = new SparseGrid(aabb, spacing());
 }
 
-PWNode::~PWNode(){
-	for(PWNode *child : children){
-		if(child != NULL){
+PWNode::~PWNode()
+{
+	for(PWNode *child : children)
+	{
+		if(child != NULL)
+		{
 			delete child;
 		}
 	}
 	delete grid;
 }
 
-string PWNode::name() const {
-	if(parent == NULL){
+string PWNode::name() const
+{
+	if(parent == NULL)
+	{
 		return "r";
-	}else{
+	}
+	else
+	{
 		return parent->name() + std::to_string(index);
 	}
 }
 
-float PWNode::spacing(){
+float PWNode::spacing()
+{
 	return float(potreeWriter->spacing / pow(2.0, float(level)));
 }
 
-string PWNode::workDir(){
+string PWNode::workDir()
+{
 	return potreeWriter->workDir;
 }
 
-string PWNode::hierarchyPath(){
+string PWNode::hierarchyPath()
+{
 	string path = "r/";
 
 	int hierarchyStepSize = potreeWriter->hierarchyStepSize;
 	string indices = name().substr(1);
 
 	int numParts = (int)floor((float)indices.size() / (float)hierarchyStepSize);
-	for(int i = 0; i < numParts; i++){
+	for(int i = 0; i < numParts; i++)
+	{
 		path += indices.substr(i * hierarchyStepSize, hierarchyStepSize) + "/";
 	}
 
 	return path;
 }
 
-string PWNode::path(){
+string PWNode::path()
+{
 	string path = hierarchyPath() + name() + potreeWriter->getExtension();
 	return path;
 }
 
-PointReader *PWNode::createReader(string path){
+PointReader *PWNode::createReader(string path)
+{
 	PointReader *reader = NULL;
 	OutputFormat outputFormat = this->potreeWriter->outputFormat;
-	if(outputFormat == OutputFormat::LAS || outputFormat == OutputFormat::LAZ){
+	if(outputFormat == OutputFormat::LAS || outputFormat == OutputFormat::LAZ)
+	{
 		reader = new LASPointReader(path);
-	}else if(outputFormat == OutputFormat::BINARY){
+	}
+	else if(outputFormat == OutputFormat::BINARY)
+	{
 		reader = new BINPointReader(path, aabb, potreeWriter->scale, this->potreeWriter->pointAttributes);
 	}
 
 	return reader;
 }
 
-PointWriter *PWNode::createWriter(string path){
+PointWriter *PWNode::createWriter(string path)
+{
 	PointWriter *writer = NULL;
 	OutputFormat outputFormat = this->potreeWriter->outputFormat;
-	if(outputFormat == OutputFormat::LAS || outputFormat == OutputFormat::LAZ){
+	if(outputFormat == OutputFormat::LAS || outputFormat == OutputFormat::LAZ)
+	{
 		writer = new LASPointWriter(path, aabb, potreeWriter->scale);
-	}else if(outputFormat == OutputFormat::BINARY){
+	}
+	else if(outputFormat == OutputFormat::BINARY)
+	{
 		writer = new BINPointWriter(path, aabb, potreeWriter->scale, this->potreeWriter->pointAttributes);
 	}
 
 	return writer;
-
-
 }
 
-void PWNode::loadFromDisk(){
-
+void PWNode::loadFromDisk()
+{
 	PointReader *reader = createReader(workDir() + "/data/" + path());
-	while(reader->readNextPoint()){
+
+	while(reader->readNextPoint())
+	{
 		Point p = reader->getPoint();
 
-		if(isLeafNode()){
+		if(isLeafNode())
+		{
 			store.push_back(p);
 		}else{
 			grid->addWithoutCheck(p.position);
@@ -138,7 +161,8 @@ void PWNode::loadFromDisk(){
 	isInMemory = true;
 }
 
-PWNode *PWNode::createChild(int childIndex ){
+PWNode *PWNode::createChild(int childIndex )
+{
 	AABB cAABB = childAABB(aabb, childIndex);
 	PWNode *child = new PWNode(potreeWriter, childIndex, cAABB, level+1);
 	child->parent = this;
@@ -147,127 +171,78 @@ PWNode *PWNode::createChild(int childIndex ){
 	return child;
 }
 
-void PWNode ::split(){
+void PWNode ::split()
+{
 	children.resize(8, NULL);
 
 	string filepath = workDir() + "/data/" + path();
-	if(fs::exists(filepath)){
+	if(fs::exists(filepath))
+	{
 		fs::remove(filepath);
 	}
 
-	for(Point &point : store){
+	for(Point &point : store)
 		add(point);
-	}
 
 	store = vector<Point>();
 }
 
-PWNode *PWNode::add(Point &point){
+PWNode *PWNode::add(Point &point)
+{
 	addCalledSinceLastFlush = true;
-
-	if(!isInMemory){
+	if(!isInMemory)
+	{
 		loadFromDisk();
 	}
 
-	if(isLeafNode()){
+	if(isLeafNode())
+	{
 		store.push_back(point);
-		if(int(store.size()) >= potreeWriter->storeSize){
+		if(int(store.size()) >= potreeWriter->storeSize) //默认两万 vector<Point>
+		{
 			split();
 		}
 
 		return this;
-	}else{
-
+	}
+	else
+	{
 		bool accepted = false;
-		//if(potreeWriter->quality == ConversionQuality::FAST){
-			accepted = grid->add(point.position);
-		//}else/* if(potreeWriter->quality == ConversionQuality::DEFAULT)*/{
-		//	PWNode *node = this;
-		//	accepted = true;
-		//	while(accepted && node != NULL){
-		//		accepted = accepted && node->grid->willBeAccepted(point.position, grid->squaredSpacing);
-		//		node = node->parent;
-		//	}
-		//
-		//	//node = this;
-		//	//while(accepted && node != NULL && node->children.size() > 0){
-		//	//	int childIndex = nodeIndex(node->aabb, point);
-		//	//
-		//	//	if(childIndex == -1){
-		//	//		break;
-		//	//	}
-		//	//
-		//	//	node = node->children[childIndex];
-		//	//
-		//	//	if(node == NULL){
-		//	//		break;
-		//	//	}
-		//	//
-		//	//	accepted = accepted && node->grid->willBeAccepted(point.position, grid->squaredSpacing);
-		//	//}
-		//
-		//	if(accepted){
-		//		grid->addWithoutCheck(point.position);
-		//	}
-		//}/*else if(potreeWriter->quality == ConversionQuality::NICE){
-		//	PWNode *node = this;
-		//	accepted = true;
-		//	while(accepted && node != NULL){
-		//		accepted = accepted && node->grid->willBeAccepted(point.position, grid->squaredSpacing);
-		//		node = node->parent;
-		//	}
-		//
-		//	node = this;
-		//	while(accepted && node != NULL && node->children.size() > 0){
-		//		int childIndex = nodeIndex(node->aabb, point);
-		//
-		//		if(childIndex == -1){
-		//			break;
-		//		}
-		//
-		//		node = node->children[childIndex];
-		//
-		//		if(node == NULL){
-		//			break;
-		//		}
-		//
-		//		accepted = accepted && node->grid->willBeAccepted(point.position, grid->squaredSpacing);
-		//	}
-		//
-		//
-		//	if(accepted){
-		//		grid->addWithoutCheck(point.position);
-		//	}
-		//}*/
+			accepted = grid->add(point.position); //删除大量注释
 
-		if(accepted){
+		if(accepted)
+		{
 			cache.push_back(point);
 			acceptedAABB.update(point.position);
 			numAccepted++;
 
 			return this;
-		}else{
+		}
+		else
+		{
 			// try adding point to higher level
-
-			if(potreeWriter->maxDepth != -1 && level >= potreeWriter->maxDepth){
+			if(potreeWriter->maxDepth != -1 && level >= potreeWriter->maxDepth)
 				return NULL;
-			}
 
 			int childIndex = nodeIndex(aabb, point);
-			if(childIndex >= 0){
-				if(isLeafNode()){
+			if(childIndex >= 0)
+			{
+				if(isLeafNode())
+				{
 					children.resize(8, NULL);
 				}
 				PWNode *child = children[childIndex];
-
 				// create child node if not existent
-				if(child == NULL){
+				if(child == NULL)
+				{
 					child = createChild(childIndex);
 				}
 
 				return child->add(point);
 				//child->add(point, targetLevel);
-			} else {
+			}
+			else
+			{
 				return NULL;
 			}
 		}
@@ -275,44 +250,53 @@ PWNode *PWNode::add(Point &point){
 	}
 }
 
-void PWNode::flush(){
-
-	std::function<void(vector<Point> &points, bool append)> writeToDisk = [&](vector<Point> &points, bool append){
+void PWNode::flush()
+{
+	std::function<void(vector<Point> &points, bool append)> writeToDisk = [&](vector<Point> &points, bool append)
+	{
 		string filepath = workDir() + "/data/" + path();
 		PointWriter *writer = NULL;
 
-		if(!fs::exists(workDir() + "/data/" + hierarchyPath())){
+		if(!fs::exists(workDir() + "/data/" + hierarchyPath()))
+		{
 			fs::create_directories(workDir() + "/data/" + hierarchyPath());
 		}
 
-		if(append){
+		if(append)
+		{
 			string temppath = workDir() + "/temp/prepend" + potreeWriter->getExtension();
 			if(fs::exists(filepath)){
 				fs::rename(fs::path(filepath), fs::path(temppath));
 			}
 
 			writer = createWriter(filepath);
-			if(fs::exists(temppath)){
+			if(fs::exists(temppath))
+			{
 				PointReader *reader = createReader(temppath);
-				while(reader->readNextPoint()){
+				while(reader->readNextPoint())
+				{
 					writer->write(reader->getPoint());
 				}
 				reader->close();
 				delete reader;
 				fs::remove(temppath);
 			}
-		}else{
-			if(fs::exists(filepath)){
+		}else
+		{
+			if(fs::exists(filepath))
+			{
 				fs::remove(filepath);
 			}
 			writer = createWriter(filepath);
 		}
 
-		for(const auto &e_c : points){
+		for(const auto &e_c : points)
+		{
 			writer->write(e_c);
 		}
 
-		if(append && (writer->numPoints != this->numAccepted)){
+		if(append && (writer->numPoints != this->numAccepted))
+		{
 			cout << "writeToDisk " << writer->numPoints  << " != " << this->numAccepted << endl;
 			exit(1);
 		}
@@ -322,28 +306,27 @@ void PWNode::flush(){
 	};
 
 
-	if(isLeafNode()){
-		if(addCalledSinceLastFlush){
+	if(isLeafNode())
+	{
+		if(addCalledSinceLastFlush)
+		{
 			writeToDisk(store, false);
-
-			//if(store.size() != this->numAccepted){
-			//	cout << "store " << store.size() << " != " << this->numAccepted << " - " << this->name() << endl;
-			//}
-		}else if(!addCalledSinceLastFlush && isInMemory){
+		}
+		else if(!addCalledSinceLastFlush && isInMemory)
+		{
 			store = vector<Point>();
-
 			isInMemory = false;
 		}
-	}else{
-		if(addCalledSinceLastFlush){
+	}
+	else
+	{
+		if(addCalledSinceLastFlush)
+		{
 			writeToDisk(cache, true);
-			//if(cache.size() != this->numAccepted){
-			//	cout << "cache " << cache.size() << " != " << this->numAccepted << " - " << this->name() << endl;
-			//
-			//	exit(1);
-			//}
 			cache = vector<Point>();
-		}else if(!addCalledSinceLastFlush && isInMemory){
+		}
+		else if(!addCalledSinceLastFlush && isInMemory)
+		{
 			delete grid;
 			grid = new SparseGrid(aabb, spacing());
 			isInMemory = false;
@@ -352,29 +335,32 @@ void PWNode::flush(){
 
 	addCalledSinceLastFlush = false;
 
-	for(PWNode *child : children){
-		if(child != NULL){
+	for(PWNode *child : children)
+	{
+		if(child != NULL)
+		{
 			child->flush();
 		}
 	}
 }
 
-vector<PWNode*> PWNode::getHierarchy(int levels){
-
+vector<PWNode*> PWNode::getHierarchy(int levels)
+{
 	vector<PWNode*> hierarchy;
-
 	list<PWNode*> stack;
 	stack.push_back(this);
-	while(!stack.empty()){
+	while(!stack.empty())
+	{
 		PWNode *node = stack.front();
 		stack.pop_front();
 
-		if(node->level >= this->level + levels){
+		if(node->level >= this->level + levels)
 			break;
-		}
+
 		hierarchy.push_back(node);
 
-		for(PWNode *child : node->children){
+		for(PWNode *child : node->children)
+		{
 			if(child != NULL){
 				stack.push_back(child);
 			}
@@ -385,38 +371,45 @@ vector<PWNode*> PWNode::getHierarchy(int levels){
 }
 
 
-void PWNode::traverse(std::function<void(PWNode*)> callback){
+void PWNode::traverse(std::function<void(PWNode*)> callback)
+{
 	callback(this);
 
-	for(PWNode *child : this->children){
-		if(child != NULL){
+	for(PWNode *child : this->children)
+	{
+		if(child != NULL)
+		{
 			child->traverse(callback);
 		}
 	}
 }
 
-void PWNode::traverseBreadthFirst(std::function<void(PWNode*)> callback){
-
+void PWNode::traverseBreadthFirst(std::function<void(PWNode*)> callback)
+{
 	// https://en.wikipedia.org/wiki/Iterative_deepening_depth-first_search
-
 	int currentLevel = 0;
 	int visitedAtLevel = 0;
 
 	do{
-
 		// doing depth first search until node->level = curentLevel
 		stack<PWNode*> st;
 		st.push(this);
-		while(!st.empty()){
+		while(!st.empty())
+		{
 			PWNode *node = st.top();
 			st.pop();
 
-			if(node->level == currentLevel){
+			if(node->level == currentLevel)
+			{
 				callback(node);
 				visitedAtLevel++;
-			}else if(node->level < currentLevel){
-				for(PWNode *child : node->children){
-					if(child != NULL){
+			}
+			else if(node->level < currentLevel)
+			{
+				for(PWNode *child : node->children)
+				{
+					if(child != NULL)
+					{
 						st.push(child);
 					}
 				}
@@ -429,22 +422,32 @@ void PWNode::traverseBreadthFirst(std::function<void(PWNode*)> callback){
 }
 
 
-PWNode* PWNode::findNode(string name){
+PWNode* PWNode::findNode(string name)
+{
 	string thisName = this->name();
 
-	if(name.size() == thisName.size()){
+	if(name.size() == thisName.size())
+	{
 		return (name == thisName) ? this : NULL;
-	}else if(name.size() > thisName.size()){
+	}
+	else if(name.size() > thisName.size())
+	{
 		int childIndex = stoi(string(1, name[thisName.size()]));
-		if(!isLeafNode() && children[childIndex] != NULL){
+		if(!isLeafNode() && children[childIndex] != NULL)
+		{
 			return children[childIndex]->findNode(name);
-		}else{
+		}
+		else
+		{
 			return NULL;
 		}
-	}else{
+	}
+	else
+	{
 		return NULL;
 	}
 }
+//--------------------------------------PWNode-----------------------------------//
 
 
 
@@ -458,10 +461,9 @@ PWNode* PWNode::findNode(string name){
 
 
 
-
-
-
-PotreeWriter::PotreeWriter(string workDir, ConversionQuality quality){
+//------------------------------PotreeWriter----------------------------------//
+PotreeWriter::PotreeWriter(string workDir, ConversionQuality quality)
+{
 	this->workDir = workDir;
 	this->quality = quality;
 }
@@ -500,26 +502,36 @@ PotreeWriter::PotreeWriter(string workDir, AABB aabb, float spacing, int maxDept
 	root = new PWNode(this, aabb);
 }
 
-string PotreeWriter::getExtension(){
-	if(outputFormat == OutputFormat::LAS){
+string PotreeWriter::getExtension()
+{
+	if(outputFormat == OutputFormat::LAS)
+	{
 		return ".las";
-	}else if(outputFormat == OutputFormat::LAZ){
+	}
+	else if(outputFormat == OutputFormat::LAZ)
+	{
 		return ".laz";
-	}else if(outputFormat == OutputFormat::BINARY){
+	}
+	else if(outputFormat == OutputFormat::BINARY)
+	{
 		return ".bin";
 	}
 
 	return "";
 }
 //joinable状态下，只有当你调用了pthread_join之后这些资源才会被释放，这是需要调用pthread_join函数。
-void PotreeWriter::waitUntilProcessed(){
-	if(storeThread.joinable()){
+void PotreeWriter::waitUntilProcessed()
+{
+	if(storeThread.joinable())
+	{
 		storeThread.join();
 	}
 }
 
-void PotreeWriter::add(Point &p){
-	if(numAdded == 0){
+void PotreeWriter::add(Point &p)
+{
+	if(numAdded == 0)
+	{
 		fs::path dataDir(workDir + "/data");
 		fs::path tempDir(workDir + "/temp");
 
@@ -530,12 +542,14 @@ void PotreeWriter::add(Point &p){
 	store.push_back(p);
 	numAdded++;
 
-	if(store.size() > 10'000){
+	if(store.size() > 10'000)
+	{
 		processStore();
 	}
 }
 
-void PotreeWriter::processStore(){
+void PotreeWriter::processStore()
+{
 	vector<Point> st = store;
 	store = vector<Point>();
 
@@ -558,21 +572,16 @@ void PotreeWriter::processStore(){
 	);
 }
 
-void PotreeWriter::flush(){
+void PotreeWriter::flush()
+{
 	processStore();
 
-	if(storeThread.joinable()){
+	if(storeThread.joinable())
+	{
 		storeThread.join();
 	}
 
-	//auto start = high_resolution_clock::now();
-
 	root->flush();
-
-	//auto end = high_resolution_clock::now();
-	//long long duration = duration_cast<milliseconds>(end-start).count();
-	//float seconds = duration / 1'000.0f;
-	//cout << "flush nodes: " << seconds << "s" << endl;
 
 	{// update cloud.js
 		cloudjs.hierarchy = vector<CloudJS::Node>();
@@ -596,7 +605,8 @@ void PotreeWriter::flush(){
 
 		list<PWNode*> stack;
 		stack.push_back(root);
-		while(!stack.empty()){
+		while(!stack.empty())
+		{
 			PWNode *node = stack.front();
 			stack.pop_front();
 
@@ -604,8 +614,10 @@ void PotreeWriter::flush(){
 
 			vector<PWNode*> hierarchy = node->getHierarchy(hierarchyStepSize + 1);
 			bool needsFlush = false;
-			for(const auto &descendant : hierarchy){
-				if(descendant->level == node->level + hierarchyStepSize ){
+			for(const auto &descendant : hierarchy)
+			{
+				if(descendant->level == node->level + hierarchyStepSize )
+				{
 					stack.push_back(descendant);
 				}
 
@@ -613,15 +625,19 @@ void PotreeWriter::flush(){
 			}
 
 
-			if(needsFlush){
+			if(needsFlush)
+			{
 				string dest = workDir + "/data/" + node->hierarchyPath() + "/" + node->name() + ".hrc";
 				ofstream fout;
 				fout.open(dest, ios::out | ios::binary);
 
-				for(const auto &descendant : hierarchy){
+				for(const auto &descendant : hierarchy)
+				{
 					char children = 0;
-					for(int j = 0; j < (int)descendant->children.size(); j++){
-						if(descendant->children[j] != NULL){
+					for(int j = 0; j < (int)descendant->children.size(); j++)
+					{
+						if(descendant->children[j] != NULL)
+						{
 							children = children | (1 << j);
 						}
 					}
@@ -635,33 +651,28 @@ void PotreeWriter::flush(){
 			}
 		}
 
-		root->traverse([](PWNode* node){
-			node->addedSinceLastFlush = false;
-		});
-
-		//cout << "hrcTotal: " << hrcTotal << "; " << "hrcFlushed: " << hrcFlushed << endl;
-
-		//auto end = high_resolution_clock::now();
-		//long long duration = duration_cast<milliseconds>(end-start).count();
-		//float seconds = duration / 1'000.0f;
-		//cout << "writing hierarchy: " << seconds << "s" << endl;
-
+		root->traverse(
+			[](PWNode* node)
+			{
+				node->addedSinceLastFlush = false;
+			}	);
 	}
 }
 
-void PotreeWriter::setProjection(string projection){
+void PotreeWriter::setProjection(string projection)
+{
 	this->projection = projection;
 }
 
-void PotreeWriter::loadStateFromDisk(){
-
-
+void PotreeWriter::loadStateFromDisk()
+{
 	{// cloudjs
 		string cloudJSPath = workDir + "/cloud.js";
 		ifstream file(cloudJSPath);
 		string line;
 		string content;
-		while (std::getline(file, line)){
+		while (std::getline(file, line))
+		{
 			content += line + "\n";
 		}
 		cloudjs = CloudJS(content);
@@ -681,7 +692,8 @@ void PotreeWriter::loadStateFromDisk(){
 	{// tree
 		vector<string> hrcPaths;
 		fs::path rootDir(workDir + "/data/r");
-		for (fs::recursive_directory_iterator iter(rootDir), end; iter != end; ++iter){
+		for (fs::recursive_directory_iterator iter(rootDir), end; iter != end; ++iter)
+		{
 			fs::path path = iter->path();
 			if(fs::is_regular_file(path)){
 				if(iEndsWith(path.extension().string(), ".hrc")){
@@ -698,8 +710,8 @@ void PotreeWriter::loadStateFromDisk(){
 		});
 
 		PWNode *root = new PWNode(this, cloudjs.boundingBox);
-		for(string hrcPath : hrcPaths){
-
+		for(string hrcPath : hrcPaths)
+		{
 			fs::path pHrcPath(hrcPath);
 			string hrcName = pHrcPath.stem().string();
 			PWNode *hrcRoot = root->findNode(hrcName);
@@ -713,7 +725,8 @@ void PotreeWriter::loadStateFromDisk(){
 			ifstream fin(hrcPath, ios::in | ios::binary);
 			std::vector<char> buffer((std::istreambuf_iterator<char>(fin)), (std::istreambuf_iterator<char>()));
 
-			for(int i = 0; 5*i < (int)buffer.size(); i++){
+			for(int i = 0; 5*i < (int)buffer.size(); i++)
+			{
 				PWNode *current= nodes[i];
 
 				char children = buffer[i*5];
@@ -721,15 +734,15 @@ void PotreeWriter::loadStateFromDisk(){
 				unsigned int* ip = reinterpret_cast<unsigned int*>(p);
 				unsigned int numPoints = *ip;
 
-				//std::bitset<8> bs(children);
-				//cout << i << "\t: " << "children: " << bs << "; " << "numPoints: " << numPoints << endl;
-
 				current->numAccepted = numPoints;
 
-				if(children != 0){
+				if(children != 0)
+				{
 					current->children.resize(8, NULL);
-					for(int j = 0; j < 8; j++){
-						if((children & (1 << j)) != 0){
+					for(int j = 0; j < 8; j++)
+					{
+						if((children & (1 << j)) != 0)
+						{
 							AABB cAABB = childAABB(current->aabb, j);
 							PWNode *child = new PWNode(this, j, cAABB, current->level + 1);
 							child->parent = current;
@@ -740,29 +753,12 @@ void PotreeWriter::loadStateFromDisk(){
 						}
 					}
 				}
-
 			}
 		}
 
 		this->root = root;
-
-		// TODO set it to actual number
 		this->numAdded = 1;
-
-		//int numNodes = 0;
-		//root->traverse([&](PWNode *node){
-		//	if(numNodes < 50){
-		//		cout << std::left << std::setw(10) << node->name();
-		//		cout << std::right << std::setw(10) << node->numAccepted << "; ";
-		//		cout << node->aabb.min << " - " << node->aabb.max << endl;
-		//	}
-		//
-		//	numNodes++;
-		//
-		//});
 	}
-
-
 }
 
 

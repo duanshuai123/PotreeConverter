@@ -102,15 +102,22 @@ PotreeArguments parseArguments(int argc, char **argv){
 
 	PotreeArguments a;
 
-	if (args.has("help")){
+	a.executablePath = "home/ds/3rdPart/PotreeConverter/Build/PotreeConverter"; //存放html模板文件
+	string strFile = "split0001.las";
+	a.source.push_back(strFile);
+	cout << a.source.size() << endl;
+
+	if (args.has("help"))
+	{
 		cout << args.usage() << endl;
 		exit(0);
-	} else if (!args.has("source") && !args.has("list-of-files")){
+	}
+	else if (!args.has("source") && !args.has("list-of-files")){
 		cout << args.usage() << endl;
-		exit(1);
+		//exit(1); // by duans
 	} else if (argc == 1) {
-		cout << args.usage() << endl;
-		exit(0);
+		//cout << args.usage() << endl;// by duans
+		//exit(0);// by duans
 	}
 
 	if (args.has("incremental") && args.has("overwrite")) {
@@ -136,7 +143,7 @@ PotreeArguments parseArguments(int argc, char **argv){
 	a.format = args.get("input-format").as<string>();
 	a.colorRange = args.get("color-range").as<vector<double>>();
 	a.intensityRange = args.get("intensity-range").as<vector<double>>();
-	
+
 	if (args.has("output-format")) {
 		string of = args.get("output-format").as<string>("BINARY");
 
@@ -160,7 +167,7 @@ PotreeArguments parseArguments(int argc, char **argv){
 	}
 
 	a.scale = args.get("scale").as<double>(0.0);
-	
+
 	if (args.has("aabb")) {
 		string strAABB = args.get("aabb").as<string>();
 		vector<double> aabbValues;
@@ -188,9 +195,10 @@ PotreeArguments parseArguments(int argc, char **argv){
 	a.projection = args.get("projection").as<string>();
 
 	if (args.has("source")) {
-		a.source = args.get("source").as<vector<string>>();
+		//a.source = args.get("source").as<vector<string>>(); by duans
 	}
-	if (a.source.size() == 0 && args.has("list-of-files")) {
+	if (a.source.size() == 0 && args.has("list-of-files"))
+	{
 		string lof = args.get("list-of-files").as<string>();
 		a.listOfFiles = lof;
 
@@ -235,10 +243,10 @@ PotreeArguments parseArguments(int argc, char **argv){
 		exit(1);
 	}
 
-	// set default parameters 
+	// set default parameters
 	fs::path pSource(a.source[0]);
 	a.outdir = args.has("outdir") ? args.get("outdir").as<string>() : pSource.generic_string() + "_converted";
-	
+
 	if (a.diagonalFraction != 0) {
 		a.spacing = 0;
 	}else if(a.spacing == 0){
@@ -284,9 +292,10 @@ void printArguments(PotreeArguments &a){
 #include <random>
 
 
-int main(int argc, char **argv){
+int main_HHHH(int argc, char **argv)
+{
 	cout.imbue(std::locale(""));
-	
+
 	try{
 		PotreeArguments a = parseArguments(argc, argv);
 		printArguments(a);
@@ -322,7 +331,56 @@ int main(int argc, char **argv){
 		cout << "ERROR: " << e.what() << endl;
 		return 1;
 	}
-	
+
 	return 0;
 }
+
+//by duans
+int main(int argc, char **argv)
+{
+	cout.imbue(std::locale(""));
+
+	try{
+		PotreeArguments a  = parseArguments(argc, argv);
+		printArguments(a);
+
+		if(a.source.size()<1)
+			a.source.push_back("split0001.las");
+		//"home/ds/3rdPart/PotreeConverter/Build/PotreeConverter/split0001.las"
+
+        PotreeConverter pc(a.executablePath, a.outdir, a.source);
+		pc.spacing = a.spacing;
+		pc.diagonalFraction = a.diagonalFraction;
+		pc.maxDepth = a.levels;
+		pc.format = a.format;
+		pc.colorRange = a.colorRange;
+		pc.intensityRange = a.intensityRange;
+		pc.scale = a.scale;
+		pc.outputFormat = a.outFormat;
+		pc.outputAttributes = a.outputAttributes;
+		pc.aabbValues = a.aabbValues;
+		pc.pageName = a.pageName;
+		pc.pageTemplatePath = a.pageTemplatePath;
+		pc.storeOption = a.storeOption;
+		pc.projection = a.projection;
+		pc.sourceListingOnly = a.sourceListingOnly;
+		pc.quality = a.conversionQuality;
+		pc.title = a.title;
+		pc.description = a.description;
+		pc.edlEnabled = a.edlEnabled;
+		pc.material = a.material;
+		pc.showSkybox = a.showSkybox;
+		pc.storeSize = a.storeSize;
+		pc.flushLimit = a.flushLimit;
+
+		pc.convert();
+	}catch(exception &e){
+		cout << "ERROR: " << e.what() << endl;
+		return 1;
+	}
+
+	return 0;
+}
+
+
 
