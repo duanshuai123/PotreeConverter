@@ -391,13 +391,14 @@ void PotreeConverter::convert()
 		cout << "spacing calculated from diagonal: " << spacing << endl;
 	}
 
-	//根据模板产生并修改HTML文件
-	if(pageName.size() > 0)
-	{
-		generatePage(pageName);
-		workDir = workDir + "/pointclouds/" + pageName;
-	}
+	//根据模板产生并修改HTML文件 by duans 默认outResult
+	if(pageName.size() < 1)
+		pageName = "outResult";
 
+	generatePage(pageName);
+	workDir = workDir + "/pointclouds/" + pageName;
+
+	//输出
 	PotreeWriter *writer = NULL;
 	if(fs::exists(fs::path(this->workDir + "/cloud.js"))) //若之前已经生成过了文件，则有三种方式
 	{

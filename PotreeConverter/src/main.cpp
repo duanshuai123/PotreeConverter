@@ -102,8 +102,8 @@ PotreeArguments parseArguments(int argc, char **argv){
 
 	PotreeArguments a;
 
-	a.executablePath = "home/ds/3rdPart/PotreeConverter/Build/PotreeConverter"; //存放html模板文件
-	string strFile = "split0001.las";
+	a.executablePath = "home/ds/3rd/PotreeConverter/Build/PotreeConverter"; //存放html模板文件
+	string strFile = "1521449054.ply"; //"20190220-112430_2.bin.ply";
 	a.source.push_back(strFile);
 	cout << a.source.size() << endl;
 
@@ -163,7 +163,7 @@ PotreeArguments parseArguments(int argc, char **argv){
 	if (args.has("output-attributes")) {
 		a.outputAttributes = args.get("output-attributes").as<vector<string>>();
 	} else {
-		a.outputAttributes = { "RGB" };
+		a.outputAttributes = { "RGB","CLASSIFICATION"}; //里面通常存储Label,Ply已经读取label至Classification by duans
 	}
 
 	a.scale = args.get("scale").as<double>(0.0);

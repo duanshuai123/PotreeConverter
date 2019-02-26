@@ -68,7 +68,7 @@ public:
 				writer->write((const char*)rgba, 4*sizeof(unsigned char));
 			}else if(attribute == PointAttribute::INTENSITY){
 				writer->write((const char*)&point.intensity, sizeof(unsigned short));
-			}else if(attribute == PointAttribute::CLASSIFICATION){
+			}else if(attribute == PointAttribute::CLASSIFICATION){  //by duans
 				writer->write((const char*)&point.classification, sizeof(unsigned char));
 			} else if (attribute == PointAttribute::RETURN_NUMBER) {
 				writer->write((const char*)&point.returnNumber, sizeof(unsigned char));
@@ -99,7 +99,7 @@ public:
 				float nx = point.normal.x;
 				float ny = point.normal.y;
 				float nz = point.normal.z;
-				
+
 				float norm1 = abs(nx) + abs(ny) + abs(nz);
 
 				nx = nx / norm1;

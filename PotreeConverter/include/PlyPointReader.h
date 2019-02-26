@@ -33,7 +33,7 @@ struct PlyPropertyType{
 	:name(name)
 	,size(size)
 	{
-	
+
 	}
 };
 
@@ -61,8 +61,8 @@ struct PlyElement{
 	}
 };
 
-unordered_map<string, PlyPropertyType> plyPropertyTypes = { 
-	{ "char", PlyPropertyType("char", 1) }, 
+unordered_map<string, PlyPropertyType> plyPropertyTypes = {
+	{ "char", PlyPropertyType("char", 1) },
 	{ "int8", PlyPropertyType("char", 1) },
 	{ "uchar", PlyPropertyType("uchar", 1) },
 	{ "uint8", PlyPropertyType("uchar", 1) },
@@ -113,7 +113,7 @@ public:
 		std::regex rFormat("^format (ascii|binary_little_endian).*");
 		std::regex rElement("^element (\\w*) (\\d*)");
 		std::regex rProperty("^property (char|int8|uchar|uint8|short|int16|ushort|uint16|int|int32|uint|uint32|float|float32|double|float64) (\\w*)");
-		
+
 		string line;
 		while(std::getline(stream, line)){
 			line = trim(line);
@@ -164,7 +164,7 @@ public:
 		if(pointsRead == pointCount){
 			return false;
 		}
-		
+
 		double x = 0;
 		double y = 0;
 		double z = 0;
@@ -175,6 +175,8 @@ public:
 		unsigned char r = 0;
 		unsigned char g = 0;
 		unsigned char b = 0;
+		uint label = 0;
+		uint intensity = 0;
 
 		if(format == PLY_FILE_FORMAT_ASCII){
 			string line;
@@ -211,6 +213,10 @@ public:
 					ny = stof(token);
 				}else if(prop.name == "nz" && prop.type.name == plyPropertyTypes["float"].name){
 					nz = stof(token);
+				}else if(prop.name == "label" && prop.type.name == plyPropertyTypes["uint"].name){
+					label = stoi(token);
+				}else if(prop.name == "intensity" && prop.type.name == plyPropertyTypes["float"].name){
+					intensity = stoi(token);
 				}
 			}
 		}else if(format == PLY_FILE_FORMAT_BINARY_LITTLE_ENDIAN){
@@ -245,19 +251,43 @@ public:
 					memcpy(&ny, (buffer+offset), prop.type.size);
 				}else if(prop.name == "nz" && prop.type.name == plyPropertyTypes["float"].name){
 					memcpy(&nz, (buffer+offset), prop.type.size);
+				}else if(prop.name == "label" && prop.type.name == plyPropertyTypes["uint"].name){ //label
+					memcpy(&label, (buffer+offset), prop.type.size);
+				}else if(prop.name == "intensity" && prop.type.name == plyPropertyTypes["float"].name){ //intensity
+					memcpy(&intensity, (buffer+offset), prop.type.size);
 				}
-				
+
 
 				offset += prop.type.size;
 			}
-			
+
 		}
 
 		point = Point(x,y,z,r,g,b);
 		point.normal.x = nx;
 		point.normal.y = ny;
 		point.normal.z = nz;
-		pointsRead++;
+
+		//by duans 补充了classification intensity
+		static int ii=0;
+		if(ii%3==0)
+		{
+			point.classification = '3';
+		}
+		else if(ii%3==1)
+		{
+			point.classification = '1';
+		}
+		else if(ii%3==2)
+		{
+			point.classification = '2';
+		}
+		ii++;
+		//(unsigned char)label;
+		//point.classification = std::to_string(label)[0];
+		point.intensity = std::to_string(intensity)[0];
+
+ 		pointsRead++;
 		return true;
 	}
 
