@@ -252,6 +252,8 @@ public:
 				}else if(prop.name == "nz" && prop.type.name == plyPropertyTypes["float"].name){
 					memcpy(&nz, (buffer+offset), prop.type.size);
 				}else if(prop.name == "label" && prop.type.name == plyPropertyTypes["uint"].name){ //label
+					//unsigned char* ucBuffer = reinterpret_cast<unsigned char*>(buffer + offset);
+					//label = ucBuffer[0];
 					memcpy(&label, (buffer+offset), prop.type.size);
 				}else if(prop.name == "intensity" && prop.type.name == plyPropertyTypes["ushort"].name){ //intensity ushort
 					memcpy(&intensity, (buffer+offset), prop.type.size);
@@ -265,11 +267,36 @@ public:
 		point.normal.x = nx;
 		point.normal.y = ny;
 		point.normal.z = nz;
-
 		//i want to cry for behind transfore ,wuwu by duans
 		point.classification = (unsigned char)label;
-		point.intensity = intensity;
+//		if(label<10)
+//			point.classification = (unsigned char)label;
+//		else if(label==10)
+//			point.classification = 'A'; //转换int65
+//		else if(label == 11)
+//			point.classification = 'B';
+//		else if(label == 12)
+//			point.classification = 'C';
+//		else if(label == 13)
+//			point.classification = 'D';
+//		else if(label == 14)
+//			point.classification = 'E';
+//		else if(label == 15)
+//			point.classification = 'F';
+//		else
+//			point.classification = 'G';
+//
+//		if(label==0)
+//			point.classification = 'C';
 
+
+//		if(label>9 && label!=0)
+//		{
+//			int n = int(point.classification);
+//			printf("%d\t%d\t%d\n",label,point.classification,n);//按10进制输出
+//		}
+
+		point.intensity = intensity;
  		pointsRead++;
 		return true;
 	}

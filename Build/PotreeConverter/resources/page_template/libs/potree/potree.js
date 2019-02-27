@@ -18618,19 +18618,26 @@ Potree.Viewer = class PotreeViewer extends THREE.EventDispatcher{
 		this.edlStrength = 1.0;
 		this.edlRadius = 1.4;
 		this.useEDL = false;
+		//by duans
 		this.classifications = {
-			0: { visible: true, name: 'never classified' },
-			1: { visible: true, name: 'unclassified' },
-			2: { visible: true, name: 'ground' },
-			3: { visible: true, name: 'low vegetation' },
-			4: { visible: true, name: 'medium vegetation' },
-			5: { visible: true, name: 'high vegetation' },
-			6: { visible: true, name: 'building' },
-			7: { visible: true, name: 'low point(noise)' },
-			8: { visible: true, name: 'key-point' },
-			9: { visible: true, name: 'water' },
-			12: { visible: true, name: 'overlap' }
-		};
+			0: { visible: true, name: '0-道路-Road' },
+			1: { visible: true, name: '1-车道线-roadlane' },
+			2: { visible: true, name: '2-停止线-stopline' },
+			3: { visible: true, name: '3-斑马线-crosswalk' },
+			4: { visible: true, name: '4-地面箭头-roadarrow' },
+			5: { visible: true, name: '5-地面标志-lanemarking' },
+			6: { visible: true, name: '6-导流线-guideline' },
+			7: { visible: true, name: '7-减速带-speedbump' },
+			8: { visible: true, name: '8-标志牌-trafficsign' },
+			9: { visible: true, name: '9-指路牌-trafficboard' },
+			10: { visible: true, name: '10-红绿灯-trafficlight' },
+			11: { visible: true, name: '11-杆子-pole' },
+			12: { visible: true, name: '12-建筑-building' },
+			13: { visible: true, name: '13-人行道-sidewalk' },
+			14: { visible: true, name: '14-背景-background' },
+			15: { visible: true, name: '15-车辆行人-vehicle' },
+			16: { visible: true, name: '16-未知-Unknown' }
+		};	
 
 		this.moveSpeed = 10;
 
@@ -22577,17 +22584,23 @@ initSidebar = (viewer) => {
 			elClassificationList.append(element);
 		};
 
-		addClassificationItem(0, 'never classified');
-		addClassificationItem(1, 'unclassified');
-		addClassificationItem(2, 'ground');
-		addClassificationItem(3, 'low vegetation');
-		addClassificationItem(4, 'medium vegetation');
-		addClassificationItem(5, 'high vegetation');
-		addClassificationItem(6, 'building');
-		addClassificationItem(7, 'low point(noise)');
-		addClassificationItem(8, 'key-point');
-		addClassificationItem(9, 'water');
-		addClassificationItem(12, 'overlap');
+		addClassificationItem(0, '0-道路-Road');
+		addClassificationItem(1, '1-车道线-roadlane');
+		addClassificationItem(2, '2-停止线-stopline');
+		addClassificationItem(3, '3-斑马线-crosswalk');
+		addClassificationItem(4, '4-地面箭头-roadarrow');
+		addClassificationItem(5, '5-地面标志-lanemarking');
+		addClassificationItem(6, '6-导流线-guideline');
+		addClassificationItem(7, '7-减速带-speedbump');
+		addClassificationItem(8, '8-标志牌-trafficsign');
+		addClassificationItem(9, '9-指路牌-trafficboard');
+		addClassificationItem(65, '10-红绿灯-trafficlight');  //'A'
+		addClassificationItem(66, '11-杆子-pole');			 //'B'
+		addClassificationItem(67, '12-建筑-building');		 //'C'
+		addClassificationItem(68, '13-人行道-sidewalk');	 //'D'
+		addClassificationItem(69, '14-背景-background');	//'E'
+		addClassificationItem(70, '15-车辆行人-vehicle');	 //'F'
+		addClassificationItem(71, '16-未知-Unknown');		//'G'
 	}
 
 	function initAccordion () {
