@@ -176,7 +176,7 @@ public:
 		unsigned char g = 0;
 		unsigned char b = 0;
 		uint label = 0;
-		uint intensity = 0;
+		ushort intensity = 0;
 
 		if(format == PLY_FILE_FORMAT_ASCII){
 			string line;
@@ -213,9 +213,9 @@ public:
 					ny = stof(token);
 				}else if(prop.name == "nz" && prop.type.name == plyPropertyTypes["float"].name){
 					nz = stof(token);
-				}else if(prop.name == "label" && prop.type.name == plyPropertyTypes["uint"].name){
+				}else if(prop.name == "label" && prop.type.name == plyPropertyTypes["uint"].name){ //siyuang给的unint
 					label = stoi(token);
-				}else if(prop.name == "intensity" && prop.type.name == plyPropertyTypes["float"].name){
+				}else if(prop.name == "intensity" && prop.type.name == plyPropertyTypes["ushort"].name){
 					intensity = stoi(token);
 				}
 			}
@@ -253,14 +253,12 @@ public:
 					memcpy(&nz, (buffer+offset), prop.type.size);
 				}else if(prop.name == "label" && prop.type.name == plyPropertyTypes["uint"].name){ //label
 					memcpy(&label, (buffer+offset), prop.type.size);
-				}else if(prop.name == "intensity" && prop.type.name == plyPropertyTypes["float"].name){ //intensity
+				}else if(prop.name == "intensity" && prop.type.name == plyPropertyTypes["ushort"].name){ //intensity ushort
 					memcpy(&intensity, (buffer+offset), prop.type.size);
 				}
 
-
 				offset += prop.type.size;
 			}
-
 		}
 
 		point = Point(x,y,z,r,g,b);
@@ -268,24 +266,9 @@ public:
 		point.normal.y = ny;
 		point.normal.z = nz;
 
-		//by duans 补充了classification intensity
-		static int ii=0;
-		if(ii%3==0)
-		{
-			point.classification = '3';
-		}
-		else if(ii%3==1)
-		{
-			point.classification = '1';
-		}
-		else if(ii%3==2)
-		{
-			point.classification = '2';
-		}
-		ii++;
-		//(unsigned char)label;
-		//point.classification = std::to_string(label)[0];
-		point.intensity = std::to_string(intensity)[0];
+		//i want to cry for behind transfore ,wuwu by duans
+		point.classification = (unsigned char)label;
+		point.intensity = intensity;
 
  		pointsRead++;
 		return true;

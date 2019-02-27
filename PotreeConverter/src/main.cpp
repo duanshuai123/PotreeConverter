@@ -103,7 +103,7 @@ PotreeArguments parseArguments(int argc, char **argv){
 	PotreeArguments a;
 
 	a.executablePath = "home/ds/3rd/PotreeConverter/Build/PotreeConverter"; //存放html模板文件
-	string strFile = "1521449054.ply"; //"20190220-112430_2.bin.ply";
+	string strFile = "20190220_112430_2_little.ply";
 	a.source.push_back(strFile);
 	cout << a.source.size() << endl;
 
