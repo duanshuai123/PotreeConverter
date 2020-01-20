@@ -41,15 +41,12 @@ public:
 	~SparseGrid();
 
 	bool isDistant(const Vector3<double> &p, GridCell *cell);
-
 	bool isDistant(const Vector3<double> &p, GridCell *cell, float &squaredSpacing);
 
 	bool willBeAccepted(const Vector3<double> &p);
-
 	bool willBeAccepted(const Vector3<double> &p, float &squaredSpacing);
 
 	bool add(Vector3<double> &p);
-
 	void addWithoutCheck(Vector3<double> &p);
 };
 

@@ -44,7 +44,7 @@ struct PotreeArguments
 	int levels;
 	string format;
 	double scale;
-	int diagonalFraction;//分母，网格的大小
+	int diagonalFraction;//分母，网格大小
 	Potree::OutputFormat outFormat;
 	vector<double> colorRange;
 	vector<double> intensityRange;
@@ -192,7 +192,7 @@ PotreeArguments parseArguments(int argc, char **argv)
 			while (std::getline(in, line)) 
             {
 				string path;
-				if (fs::path(line).is_absolute()) 
+				if (fs::path(line).is_absolute())
 					path = line;
 				else 
                 {
@@ -201,7 +201,7 @@ PotreeArguments parseArguments(int argc, char **argv)
 					path = lofDir.string() + "/" + line;
 				}
 
-				if (fs::exists(fs::path(path))) 
+				if (fs::exists(fs::path(path)))
                 {
 					a.source.push_back(path);
 				} 
@@ -212,7 +212,7 @@ PotreeArguments parseArguments(int argc, char **argv)
 				}
 			}
 			in.close();
-		} 
+		}
 		else 
         {
 			cerr << "ERROR: specified list of files not found: '" << a.listOfFiles << "'" << endl;
@@ -283,7 +283,7 @@ void printArguments(PotreeArguments &a)
 //by duans
 int main(int argc, char **argv)
 {
-	cout.imbue(std::locale(""));
+    cout.imbue(std::locale(""));
 	try{
         
 		PotreeArguments a  = parseArguments(argc, argv);

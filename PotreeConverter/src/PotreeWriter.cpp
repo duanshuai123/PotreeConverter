@@ -85,6 +85,7 @@ string PWNode::workDir()
 	return potreeWriter->workDir;
 }
 
+//分层路径
 string PWNode::hierarchyPath()
 {
 	string path = "r/";
@@ -150,7 +151,9 @@ void PWNode::loadFromDisk()
 		if(isLeafNode())
 		{
 			store.push_back(p);
-		}else{
+		}
+		else
+        {
 			grid->addWithoutCheck(p.position);
 		}
 	}
@@ -281,7 +284,8 @@ void PWNode::flush()
 				delete reader;
 				fs::remove(temppath);
 			}
-		}else
+		}
+		else
 		{
 			if(fs::exists(filepath))
 			{
@@ -454,13 +458,6 @@ PWNode* PWNode::findNode(string name)
 
 
 
-
-
-
-
-
-
-
 //------------------------------PotreeWriter----------------------------------//
 PotreeWriter::PotreeWriter(string workDir, ConversionQuality quality)
 {
@@ -468,7 +465,9 @@ PotreeWriter::PotreeWriter(string workDir, ConversionQuality quality)
 	this->quality = quality;
 }
 
-PotreeWriter::PotreeWriter(string workDir, AABB aabb, float spacing, int maxDepth, double scale, OutputFormat outputFormat, PointAttributes pointAttributes, ConversionQuality quality){
+PotreeWriter::PotreeWriter(string workDir, AABB aabb, float spacing, int maxDepth, double scale, 
+                           OutputFormat outputFormat, PointAttributes pointAttributes, ConversionQuality quality)
+{
 	this->workDir = workDir;
 	this->aabb = aabb;
 	this->spacing = spacing;
@@ -595,8 +594,6 @@ void PotreeWriter::flush()
 		cloudOut.close();
 	}
 
-
-
 	{// write hierarchy
 		//auto start = high_resolution_clock::now();
 
@@ -695,19 +692,21 @@ void PotreeWriter::loadStateFromDisk()
 		for (fs::recursive_directory_iterator iter(rootDir), end; iter != end; ++iter)
 		{
 			fs::path path = iter->path();
-			if(fs::is_regular_file(path)){
-				if(iEndsWith(path.extension().string(), ".hrc")){
+			if(fs::is_regular_file(path))
+            {
+				if(iEndsWith(path.extension().string(), ".hrc"))
+                {
 					hrcPaths.push_back(path.string());
-				}else{
-
 				}
-			}else if(fs::is_directory(path)){
-
+				else
+                {
+				}
+			}
+			else if(fs::is_directory(path))
+            {
 			}
 		}
-		std::sort(hrcPaths.begin(), hrcPaths.end(), [](string &a, string &b){
-			return a.size() < b.size();
-		});
+		std::sort(hrcPaths.begin(), hrcPaths.end(),[](string &a, string &b){ return a.size() < b.size();} );
 
 		PWNode *root = new PWNode(this, cloudjs.boundingBox);
 		for(string hrcPath : hrcPaths)

@@ -33,15 +33,12 @@ SparseGrid::~SparseGrid()
 bool SparseGrid::isDistant(const Vector3<double> &p, GridCell *cell)
 {
 	if(!cell->isDistant(p, squaredSpacing))
-    {
 		return false;
-	}
 
 	for(const auto &neighbour : cell->neighbours) 
     {
-		if(!neighbour->isDistant(p, squaredSpacing)){
+		if(!neighbour->isDistant(p, squaredSpacing))
 			return false;
-		}
 	}
 
 	return true;

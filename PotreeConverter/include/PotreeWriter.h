@@ -23,47 +23,31 @@ class PotreeWriter;
 class PointReader;
 class PointWriter;
 
+//Node八叉树的结点
 class PWNode
 {
 public:
-	int index = -1;
-	AABB aabb;
-	AABB acceptedAABB; //??
-	int level = 0;
-	SparseGrid *grid;//稀疏网格
-	unsigned int numAccepted = 0;
-	PWNode *parent = NULL;
-	vector<PWNode*> children;
-	bool addedSinceLastFlush = true;
-	bool addCalledSinceLastFlush = false;
-	PotreeWriter *potreeWriter;
-	vector<Point> cache;
-	vector<Point> store;
-	bool isInMemory = true;
-
 	PWNode(PotreeWriter* potreeWriter, AABB aabb);
 	PWNode(PotreeWriter* potreeWriter, int index, AABB aabb, int level);
 	~PWNode();
-
-	string name() const;
-
-	float spacing();
+public:
+	string name() const; //名称-int类型数字
+	float spacing();     //该结点的间距，总间距/2^level
 
 	bool isLeafNode(){return children.size() == 0;}
-
 	bool isInnerNode(){	return children.size() > 0;}
 
+	//从硬盘加载文件读取
 	void loadFromDisk();
-
+    
+    //Node添加结点
 	PWNode *add(Point &point);
-
 	PWNode *createChild(int childIndex);
 
 	void split();
 
-	string workDir();
-	//分层路径
-	string hierarchyPath();
+	string workDir(); //输出路径
+	string hierarchyPath();//分层路径
 
 	string path();
 
@@ -77,6 +61,21 @@ public:
 	vector<PWNode*> getHierarchy(int levels);
 
 	PWNode* findNode(string name);
+public:
+    int index = -1;
+	AABB aabb;
+	AABB acceptedAABB; //??
+	int level = 0;         
+	SparseGrid *grid;      //稀疏网格？
+	unsigned int numAccepted = 0;
+	PWNode *parent = NULL;
+	vector<PWNode*> children;
+	bool addedSinceLastFlush = true;
+	bool addCalledSinceLastFlush = false;
+	PotreeWriter *potreeWriter;
+	vector<Point> cache;
+	vector<Point> store;
+	bool isInMemory = true;
 private:
 	PointReader *createReader(string path);
 	PointWriter *createWriter(string path);
@@ -86,7 +85,6 @@ private:
 class PotreeWriter
 {
 public:
-
 	AABB aabb;
 	AABB tightAABB;
 	string workDir;
@@ -99,7 +97,7 @@ public:
 	CloudJS cloudjs;
 	OutputFormat outputFormat;   //转出格式
 	PointAttributes pointAttributes;//点的属性
-	int hierarchyStepSize = 5;  //设置的分层数目
+	int hierarchyStepSize = 5;  //设置的分层数目？
 	vector<Point> store;  //存储点的数组？？
 	thread storeThread;  //存储的线程
 	int pointsInMemory = 0;
