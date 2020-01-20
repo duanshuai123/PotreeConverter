@@ -23,8 +23,8 @@ class PotreeWriter;
 class PointReader;
 class PointWriter;
 
-class PWNode{
-
+class PWNode
+{
 public:
 	int index = -1;
 	AABB aabb;
@@ -38,27 +38,20 @@ public:
 	bool addCalledSinceLastFlush = false;
 	PotreeWriter *potreeWriter;
 	vector<Point> cache;
-	//int storeLimit = 20'000;
 	vector<Point> store;
 	bool isInMemory = true;
 
 	PWNode(PotreeWriter* potreeWriter, AABB aabb);
-
 	PWNode(PotreeWriter* potreeWriter, int index, AABB aabb, int level);
-
 	~PWNode();
 
 	string name() const;
 
 	float spacing();
 
-	bool isLeafNode(){
-		return children.size() == 0;
-	}
+	bool isLeafNode(){return children.size() == 0;}
 
-	bool isInnerNode(){
-		return children.size() > 0;
-	}
+	bool isInnerNode(){	return children.size() > 0;}
 
 	void loadFromDisk();
 
@@ -69,7 +62,6 @@ public:
 	void split();
 
 	string workDir();
-
 	//分层路径
 	string hierarchyPath();
 
@@ -81,22 +73,18 @@ public:
 	void traverse(std::function<void(PWNode*)> callback);
 	//广度优先
 	void traverseBreadthFirst(std::function<void(PWNode*)> callback);
-
 	//获取分层
 	vector<PWNode*> getHierarchy(int levels);
 
 	PWNode* findNode(string name);
-
 private:
 	PointReader *createReader(string path);
 	PointWriter *createWriter(string path);
-
 };
 
 
-
-class PotreeWriter{
-
+class PotreeWriter
+{
 public:
 
 	AABB aabb;
@@ -124,11 +112,7 @@ public:
 
 	PotreeWriter(string workDir, AABB aabb, float spacing, int maxDepth, double scale, OutputFormat outputFormat, PointAttributes pointAttributes, ConversionQuality quality);
 
-	~PotreeWriter(){
-		close();
-
-		delete root;
-	}
+	~PotreeWriter() { close(); delete root; }
 
 	string getExtension();
 
@@ -140,9 +124,7 @@ public:
 
 	void flush();
 
-	void close(){
-		flush();
-	}
+	void close(){ flush(); }
 
 	void setProjection(string projection);
 

@@ -329,16 +329,20 @@ Potree.toMaterialName = function(materialID) {
 
 Potree.getMeasurementIcon = function(measurement){
 	if (measurement instanceof Potree.Measure) {
-		if (measurement.showDistances && !measurement.showArea && !measurement.showAngles) {
-			return `${Potree.resourcePath}/icons/distance.svg`;
-		} else if (measurement.showDistances && measurement.showArea && !measurement.showAngles) {
-			return `${Potree.resourcePath}/icons/area.svg`;
-		} else if (measurement.maxMarkers === 1) {
+	  	if (measurement.GeoType === 0) {
 			return `${Potree.resourcePath}/icons/point.svg`;
-		} else if (!measurement.showDistances && !measurement.showArea && measurement.showAngles) {
-			return `${Potree.resourcePath}/icons/angle.png`;
-		} else if (measurement.showHeight) {
-			return `${Potree.resourcePath}/icons/height.svg`;
+		 }else if (measurement.GeoType ===1) {
+			return `${Potree.resourcePath}/icons/HDRefLine.svg`;//RefLine
+		} else if (measurement.GeoType ===2) {
+			return `${Potree.resourcePath}/icons/HDRoadLine.svg`;//RoadLine
+		} else if (measurement.GeoType === 3) {
+			return `${Potree.resourcePath}/icons/HDStopLine.svg`;//停止线
+		} else if (measurement.GeoType === 4) {
+			return `${Potree.resourcePath}/icons/HDTrafficSign.png`;//指示牌
+		} else if (measurement.GeoType === 5) {
+			return `${Potree.resourcePath}/icons/HDLight.png`;//红绿灯
+		} else if (measurement.GeoType === 6) {
+			return `${Potree.resourcePath}/icons/HDLaneMarking.png`;//红绿灯
 		} else {
 			return `${Potree.resourcePath}/icons/distance.svg`;
 		}
@@ -3227,7 +3231,6 @@ void doClipping(){
 
 
 // 
-// ##     ##    ###    #### ##    ## 
 // ###   ###   ## ##    ##  ###   ## 
 // #### ####  ##   ##   ##  ####  ## 
 // ## ### ## ##     ##  ##  ## ## ## 
@@ -3920,6 +3923,7 @@ Potree.POCLoader = function () {
  * @param url
  * @param loadingFinishedListener executed after loading the binary has been finished
  */
+//by duans 动态加载数据
 Potree.POCLoader.load = function load (url, callback) {
 	try {
 		let pco = new Potree.PointCloudOctreeGeometry();
@@ -5219,6 +5223,23 @@ Potree.Gradients = {
 	]
 };
 
+// Potree.Classification = {
+// 	'DEFAULT': {
+// 		0: new THREE.Vector4(0.5, 0.5, 0.5, 1.0),
+// 		1: new THREE.Vector4(0.5, 0.5, 0.5, 1.0),
+// 		2: new THREE.Vector4(0.63, 0.32, 0.18, 1.0),
+// 		3: new THREE.Vector4(0.0, 1.0, 0.0, 1.0),
+// 		4: new THREE.Vector4(0.0, 0.8, 0.0, 1.0),
+// 		5: new THREE.Vector4(0.0, 0.6, 0.0, 1.0),
+// 		6: new THREE.Vector4(1.0, 0.66, 0.0, 1.0),
+// 		7:	new THREE.Vector4(1.0, 0, 1.0, 1.0),
+// 		8: new THREE.Vector4(1.0, 0, 0.0, 1.0),
+// 		9: new THREE.Vector4(0.0, 0.0, 1.0, 1.0),
+// 		12:	new THREE.Vector4(1.0, 1.0, 0.0, 1.0),
+// 		'DEFAULT': new THREE.Vector4(0.3, 0.6, 0.6, 0.5)
+// 	}
+// };
+
 Potree.Classification = {
 	'DEFAULT': {
 		0: new THREE.Vector4(0.5, 0.5, 0.5, 1.0),
@@ -5231,7 +5252,12 @@ Potree.Classification = {
 		7:	new THREE.Vector4(1.0, 0, 1.0, 1.0),
 		8: new THREE.Vector4(1.0, 0, 0.0, 1.0),
 		9: new THREE.Vector4(0.0, 0.0, 1.0, 1.0),
-		12:	new THREE.Vector4(1.0, 1.0, 0.0, 1.0),
+		10: new THREE.Vector4(1.0, 1.0, 0.0, 1.0), //补充的默认颜色？？
+		11: new THREE.Vector4(1.0, 1.0, 0.5, 1.0), //柱子棕色
+		12: new THREE.Vector4(0.0, 0.0, 1.0, 1.0),
+		13: new THREE.Vector4(0.0, 0.0, 1.0, 1.0),
+		14: new THREE.Vector4(0.0, 0.0, 1.0, 1.0),
+		15: new THREE.Vector4(0.0, 0.0, 1.0, 1.0),
 		'DEFAULT': new THREE.Vector4(0.3, 0.6, 0.6, 0.5)
 	}
 };
@@ -9236,6 +9262,346 @@ Potree.ProfileData = class ProfileData {
 		return size;
 	}
 };
+Potree.ProfileRequestV2 = class ProfileRequestV2 {
+	constructor (pointcloud, profile, maxDepth, callback) {
+		this.pointcloud = pointcloud;
+		this.profile = profile;
+		this.maxDepth = maxDepth || Number.MAX_VALUE;
+		this.callback = callback;
+		this.temporaryResult = new Potree.ProfileData(this.profile);
+		this.pointsServed = 0;
+		this.highestLevelServed = 0;
+
+		this.priorityQueue = new BinaryHeap(function (x) { return 1 / x.weight; });
+
+		this.initializeV2();
+		console.log(this);
+		//this.updateGeneratorV2();
+	};
+
+	initializeV2() {
+		this.priorityQueue.push({node: this.pointcloud.pcoGeometry.root, weight: Infinity});
+
+		let maxNodesPerUpdate = 1;
+		let intersectedNodes = [];
+			
+		for (let i = 0; i < Math.min(maxNodesPerUpdate, this.priorityQueue.size()); i++) {
+			let element = this.priorityQueue.pop();
+			let node = element.node;
+			
+			if(node.level > this.maxDepth){
+				continue;
+			}
+			
+			if (node.loaded) {
+				// add points to result
+				intersectedNodes.push(node);
+				Potree.getLRU().touch(node);
+				this.highestLevelServed = Math.max(node.getLevel(), this.highestLevelServed);
+			
+				let doTraverse = (node.level % node.pcoGeometry.hierarchyStepSize) === 0 && node.hasChildren;
+				doTraverse = doTraverse || node.getLevel() === 0;
+				if (doTraverse) {
+					this.traverseV2(node);
+				}
+			} else {
+				node.load();
+				this.priorityQueue.push(element);
+			}
+		}
+			
+		if (intersectedNodes.length > 0) {
+			
+			for(let done of this.getPointsInsideProfileV2(intersectedNodes, this.temporaryResult)){
+				if(!done){
+					//console.log("updateGenerator yields");
+					;//yield false;
+				}
+			}
+		}
+	};
+
+	// traverse the node and add intersecting descendants to queue
+	traverseV2 (node) {
+		let stack = [];
+		for (let i = 0; i < 8; i++) {
+			let child = node.children[i];
+			if (child && this.pointcloud.nodeIntersectsProfile(child, this.profile)) {
+				stack.push(child);
+			}
+		}
+
+		while (stack.length > 0) {
+			let node = stack.pop();
+			let weight = node.boundingSphere.radius;
+
+			this.priorityQueue.push({node: node, weight: weight});
+
+			// add children that intersect the cutting plane
+			if (node.level < this.maxDepth) {
+				for (let i = 0; i < 8; i++) {
+					let child = node.children[i];
+					if (child && this.pointcloud.nodeIntersectsProfile(child, this.profile)) {
+						stack.push(child);
+					}
+				}
+			}
+		}
+	};
+
+	//原有流程的备份，其中逻辑被放置到初始化函数initializeV2中
+	*updateGeneratorV2(){
+		let maxNodesPerUpdate = 1;
+		let intersectedNodes = [];
+			
+		for (let i = 0; i < Math.min(maxNodesPerUpdate, this.priorityQueue.size()); i++) {
+			let element = this.priorityQueue.pop();
+			let node = element.node;
+			
+			if(node.level > this.maxDepth){
+				continue;
+			}
+			
+			if (node.loaded) {
+				// add points to result
+				intersectedNodes.push(node);
+				Potree.getLRU().touch(node);
+				this.highestLevelServed = Math.max(node.getLevel(), this.highestLevelServed);
+			
+				let doTraverse = (node.level % node.pcoGeometry.hierarchyStepSize) === 0 && node.hasChildren;
+				doTraverse = doTraverse || node.getLevel() === 0;
+				if (doTraverse) {
+					this.traverse(node);
+				}
+			} else {
+				node.load();
+				this.priorityQueue.push(element);
+			}
+		}
+			
+		if (intersectedNodes.length > 0) {
+			
+			for(let done of this.getPointsInsideProfileV2(intersectedNodes, this.temporaryResult)){
+				if(!done){
+					//console.log("updateGenerator yields");
+					//yield false;
+				}
+			}
+			if (this.temporaryResult.size() > 100) {
+				this.pointsServed += this.temporaryResult.size();
+				this.callback.onProgress({request: this, points: this.temporaryResult});
+				this.temporaryResult = new Potree.ProfileData(this.profile);
+			}
+		}
+			
+		if (this.priorityQueue.size() === 0) {
+			// we're done! inform callback and remove from pending requests
+			
+			if (this.temporaryResult.size() > 0) {
+				this.pointsServed += this.temporaryResult.size();
+				this.callback.onProgress({request: this, points: this.temporaryResult});
+				this.temporaryResult = new Potree.ProfileData(this.profile);
+			}
+			
+			//this.callback.onFinish({request: this});
+			
+			let index = this.pointcloud.profileRequests.indexOf(this);
+			if (index >= 0) {
+				this.pointcloud.profileRequests.splice(index, 1);
+			}
+		}
+			
+		yield true;
+	};
+	
+
+	* getAcceptedV2(numPoints, node, matrix, segment, segmentDir, points, totalMileage){
+		let checkpoint = performance.now();
+
+		let accepted = new Uint32Array(numPoints);
+		let mileage = new Float64Array(numPoints);
+		let acceptedPositions = new Float32Array(numPoints * 3);
+		let numAccepted = 0;
+
+		let pos = new THREE.Vector3();
+		let svp = new THREE.Vector3();
+
+		let view = new Float32Array(node.geometry.attributes.position.array);
+
+		for (let i = 0; i < numPoints; i++) {
+
+			pos.set(
+				view[i * 3 + 0],
+				view[i * 3 + 1],
+				view[i * 3 + 2]);
+		
+			pos.applyMatrix4(matrix);
+			let distance = Math.abs(segment.cutPlane.distanceToPoint(pos));
+			let centerDistance = Math.abs(segment.halfPlane.distanceToPoint(pos));
+
+			if (distance < this.profile.width / 2 && centerDistance < segment.length / 2) {
+				svp.subVectors(pos, segment.start);
+				let localMileage = segmentDir.dot(svp);
+
+				accepted[numAccepted] = i;
+				mileage[numAccepted] = localMileage + totalMileage;
+				points.boundingBox.expandByPoint(pos);
+
+				acceptedPositions[3 * numAccepted + 0] = pos.x;
+				acceptedPositions[3 * numAccepted + 1] = pos.y;
+				acceptedPositions[3 * numAccepted + 2] = pos.z;
+
+				numAccepted++;
+			}
+
+			if((i % 1000) === 0){
+				//let duration = performance.now() - checkpoint;
+				//if(duration > 4){
+					//console.log(`getAccepted yield after ${duration}ms`);
+					//yield false;
+					//checkpoint = performance.now();
+				//}
+			}
+		}
+
+		accepted = accepted.subarray(0, numAccepted);
+		mileage = mileage.subarray(0, numAccepted);
+		acceptedPositions = acceptedPositions.subarray(0, numAccepted * 3);
+		yield [accepted, mileage, acceptedPositions];
+	};
+
+	*getPointsInsideProfileV2(nodes, target){
+		let checkpoint = performance.now();
+		let totalMileage = 0;
+
+		let pointsProcessed = 0;
+
+		for (let segment of target.segments) {
+			for (let node of nodes) {
+				let numPoints = node.numPoints;
+				let geometry = node.geometry;
+
+				if(!numPoints){
+					continue;
+				}
+
+				{ // skip if current node doesn't intersect current segment
+					let bbWorld = node.boundingBox.clone().applyMatrix4(this.pointcloud.matrixWorld);
+					let bsWorld = bbWorld.getBoundingSphere();
+
+					let start = new THREE.Vector3(segment.start.x, segment.start.y, bsWorld.center.z);
+					let end = new THREE.Vector3(segment.end.x, segment.end.y, bsWorld.center.z);
+						
+					let closest = new THREE.Line3(start, end).closestPointToPoint(bsWorld.center, true);
+					let distance = closest.distanceTo(bsWorld.center);
+
+					let intersects = (distance < (bsWorld.radius + target.profile.width));
+
+					if(!intersects){
+						continue;
+					}
+				}
+
+				let sv = new THREE.Vector3().subVectors(segment.end, segment.start).setZ(0);
+				let segmentDir = sv.clone().normalize();
+
+				let points = new Potree.Points();
+
+				let nodeMatrix = new THREE.Matrix4().makeTranslation(...node.boundingBox.min.toArray());
+
+				let matrix = new THREE.Matrix4().multiplyMatrices(
+					this.pointcloud.matrixWorld, nodeMatrix);
+
+				pointsProcessed = pointsProcessed + numPoints;
+
+				let accepted = null;
+				let mileage = null;
+				let acceptedPositions = null;
+				for(let result of this.getAcceptedV2(numPoints, node, matrix, segment, segmentDir, points,totalMileage)){
+					if(!result){
+						//let duration = performance.now() - checkpoint;
+						//console.log(`getPointsInsideProfile yield after ${duration}ms`);
+						//yield false;
+						//checkpoint = performance.now();
+					}else{
+						[accepted, mileage, acceptedPositions] = result;
+					}
+				}
+
+				//let duration = performance.now() - checkpoint;
+				//if(duration > 4){
+					//console.log(`getPointsInsideProfile yield after ${duration}ms`);
+					//yield false;
+					//checkpoint = performance.now();
+				//}
+
+				points.data.position = acceptedPositions;
+
+				let relevantAttributes = Object.keys(geometry.attributes).filter(a => !["position", "indices"].includes(a));
+				for(let attributeName of relevantAttributes){
+
+					let attribute = geometry.attributes[attributeName];
+					let numElements = attribute.array.length / numPoints;
+
+					if(numElements !== parseInt(numElements)){
+						debugger;
+					}
+
+					let Type = attribute.array.constructor;
+
+					let filteredBuffer = new Type(numElements * accepted.length);
+
+					let source = attribute.array;
+					let target = filteredBuffer;
+
+					for(let i = 0; i < accepted.length; i++){
+
+						let index = accepted[i];
+						
+						let start = index * numElements;
+						let end = start + numElements;
+						let sub = source.subarray(start, end);
+
+						target.set(sub, i * numElements);
+					}
+
+					points.data[attributeName] = filteredBuffer;
+				}
+
+				points.data['mileage'] = mileage;
+				points.numPoints = accepted.length;
+
+				segment.points.add(points);
+			}
+
+			totalMileage += segment.length;
+		}
+
+		for (let segment of target.segments) {
+			target.boundingBox.union(segment.points.boundingBox);
+		}
+
+		//console.log(`getPointsInsideProfile finished`);
+		yield true;
+	};
+
+	finishLevelThenCancel () {
+		if (this.cancelRequested) {
+			return;
+		}
+
+		this.maxDepth = this.highestLevelServed;
+		this.cancelRequested = true;
+
+		//console.log(`maxDepth: ${this.maxDepth}`);
+	};
+
+	cancel () {
+		this.callback.onCancel();
+
+		this.priorityQueue = new BinaryHeap(function (x) { return 1 / x.weight; });
+	};
+};
 
 Potree.ProfileRequest = class ProfileRequest {
 	constructor (pointcloud, profile, maxDepth, callback) {
@@ -10127,6 +10493,12 @@ Potree.PointCloudOctree = class extends Potree.PointCloudTree {
 	 *
 	 *
 	 */
+
+	getPointsInProfileV2 (profile, maxDepth, callback) {
+			let request = new Potree.ProfileRequestV2(this, profile, maxDepth, callback);
+			return request;
+	}
+
 	getPointsInProfile (profile, maxDepth, callback) {
 		if (callback) {
 			let request = new Potree.ProfileRequest(this, profile, maxDepth, callback);
@@ -12225,7 +12597,7 @@ Potree.Version.prototype.upTo = function (version) {
 	return !this.newerThan(version);
 };
 
-
+//封装每个量测的整体要素，包括圆球节点、线、Label、数值内容
 Potree.Measure = class Measure extends THREE.Object3D {
 	constructor () {
 		super();
@@ -12241,6 +12613,7 @@ Potree.Measure = class Measure extends THREE.Object3D {
 		this._showAngles = false;
 		this._showHeight = false;
 		this.maxMarkers = Number.MAX_SAFE_INTEGER;
+		this.GeoType = -1;//增加了几何的类型 by duans
 
 		this.sphereGeometry = new THREE.SphereGeometry(0.4, 10, 10);
 		this.color = new THREE.Color(0xff0000);
@@ -12293,7 +12666,7 @@ Potree.Measure = class Measure extends THREE.Object3D {
 		this.areaLabel.setTextColor({r: 180, g: 220, b: 180, a: 1.0});
 		this.areaLabel.material.depthTest = false;
 		this.areaLabel.material.opacity = 1;
-		this.areaLabel.visible = false; ;
+		this.areaLabel.visible = false;
 		this.add(this.areaLabel);
 	}
 
@@ -12748,6 +13121,7 @@ Potree.MeasuringTool = class MeasuringTool extends THREE.EventDispatcher {
 
 		this.viewer = viewer;
 		this.renderer = viewer.renderer;
+		this.requests = [];
 
 		this.addEventListener('start_inserting_measurement', e => {
 			this.viewer.dispatchEvent({
@@ -12755,7 +13129,7 @@ Potree.MeasuringTool = class MeasuringTool extends THREE.EventDispatcher {
 			});
 		});
 
-		this.scene = new THREE.Scene();
+		this.scene = new THREE.Scene(); //显示的容器
 		this.scene.name = 'scene_measurement';
 		this.light = new THREE.PointLight(0xffffff, 1.0);
 		this.scene.add(this.light);
@@ -12787,6 +13161,48 @@ Potree.MeasuringTool = class MeasuringTool extends THREE.EventDispatcher {
 		e.scene.addEventListener('measurement_removed', this.onRemove);
 	}
 
+	AddPoints(pointcloud,points){
+		let i = 0;
+		console.log(i);
+	}
+
+	//处理量测结果
+	SearchByBox(measure,Length,Width,Height){
+		let nCounts = measure.points.length; //点的数量<1 则返回
+		let profile = new Potree.Profile();
+		profile.setWidth(Width/2);
+		profile.setHeight(Height);
+
+		if(nCounts<1)
+			return;
+		if(nCounts==1){
+			let point = measure.points[0].position;
+			// point.x - length/2; //沿着X轴方向，利用profile的特性，构造一个盒子用于选点
+			// point.y;
+			// point.z - Height/2;
+
+			// point.x + length/2;
+			// point.y;
+			// point.z - Height/2;
+			profile.addMarker(new THREE.Vector3(point.x - Length/2, point.y, point.z - Height/2));
+			profile.addMarker(new THREE.Vector3(point.x + Length/2, point.y, point.z - Height/2));
+		}
+		else if(nCounts>1){
+			for(let point of measure.points){
+				profile.addMarker(point.position.clone());
+			}
+		}
+
+		let pSize = this.viewer.scene.pointclouds.length;
+		for (let pointcloud of this.viewer.scene.pointclouds.filter(p => p.visible)) {
+			let request = pointcloud.getPointsInProfileV2(profile, null);
+			let Points = request.temporaryResult;
+			this.requests.push(request);
+		}
+		console.log(this.requests.length);
+	}
+
+
 	startInsertion (args = {}) {
 		let domElement = this.viewer.renderer.domElement;
 
@@ -12805,6 +13221,7 @@ Potree.MeasuringTool = class MeasuringTool extends THREE.EventDispatcher {
 		measure.closed = args.closed || false;
 		measure.maxMarkers = args.maxMarkers || Infinity;
 		measure.name = args.name || 'Measurement';
+		measure.GeoType = args.GeoType ; // 运算符||表示或，bool判断用的？？
 
 		this.scene.add(measure);
 
@@ -12813,18 +13230,22 @@ Potree.MeasuringTool = class MeasuringTool extends THREE.EventDispatcher {
 			callback: null
 		};
 
+		//InsertionCallback帮定了mouseup事件操作，当鼠标释放（mouseup)时，执行insertionCallback
 		let insertionCallback = (e) => {
 			if (e.button === THREE.MOUSE.LEFT) {
 				measure.addMarker(measure.points[measure.points.length - 1].position.clone());
 
+				//采集点若超出最大限制，就取消
 				if (measure.points.length >= measure.maxMarkers) {
 					cancel.callback();
+					this.SearchByBox(measure,2,2,2);
 				}
 
 				this.viewer.inputHandler.startDragging(
 					measure.spheres[measure.spheres.length - 1]);
 			} else if (e.button === THREE.MOUSE.RIGHT) {
 				cancel.callback();
+				this.SearchByBox(measure,2,2,2);
 			}
 		};
 
@@ -12869,7 +13290,7 @@ Potree.MeasuringTool = class MeasuringTool extends THREE.EventDispatcher {
 			for(let sphere of measure.spheres){			
 				let distance = camera.position.distanceTo(sphere.getWorldPosition());
 				let pr = Potree.utils.projectedRadius(1, camera, distance, clientWidth, clientHeight);
-				let scale = (15 / pr);
+				let scale = (8 / pr);//球大小SphereSize by duans
 				sphere.scale.set(scale, scale, scale);
 			}
 
@@ -13031,8 +13452,8 @@ Potree.Profile = class extends THREE.Object3D {
 			box.scale.set(length, 10000, this.width);
 			box.up.set(0, 0, 1);
 
-			let center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
-			let diff = new THREE.Vector3().subVectors(end, start);
+			let center = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5); //线段的中点
+			let diff = new THREE.Vector3().subVectors(end, start); // start --> end的向量
 			let target = new THREE.Vector3(diff.y, -diff.x, 0);
 
 			box.position.set(0, 0, 0);
@@ -13073,7 +13494,7 @@ Potree.Profile = class extends THREE.Object3D {
 			this.edges.push(edge);
 
 			let boxGeometry = new THREE.BoxGeometry(1, 1, 1);
-			let boxMaterial = new THREE.MeshBasicMaterial({color: 0xff0000, transparent: true, opacity: 0.2});
+			let boxMaterial = new THREE.MeshBasicMaterial({color: 0xff0000, transparent: true, opacity: 0.2});   //
 			let box = new THREE.Mesh(boxGeometry, boxMaterial);
 			box.visible = false;
 
@@ -13081,7 +13502,7 @@ Potree.Profile = class extends THREE.Object3D {
 			this.boxes.push(box);
 		}
 
-		{ // event listeners
+		{ // event listeners //拖拽节点功能
 			let drag = (e) => {
 				let I = Potree.utils.getMousePointCloudIntersection(
 					e.drag.end, 
@@ -13183,6 +13604,15 @@ Potree.Profile = class extends THREE.Object3D {
 
 	getWidth () {
 		return this.width;
+	}
+	//设置高
+	setHeight (height) {
+		this.height = height;
+		this.update();
+	}
+	//获取高
+	getHeight () {
+		return this.height;
 	}
 
 	update () {
@@ -13363,7 +13793,7 @@ Potree.ProfileTool = class ProfileTool extends THREE.EventDispatcher {
 					let distance = camera.position.distanceTo(profile.points[0]);
 					let clientSize = this.viewer.renderer.getSize();
 					let pr = Potree.utils.projectedRadius(1, camera, distance, clientSize.width, clientSize.height);
-					let width = (10 / pr);
+					let width = (8 / pr);
 
 					profile.setWidth(width);
 				}
@@ -15561,6 +15991,90 @@ Potree.SpotLightHelper = class SpotLightHelper extends THREE.Object3D{
  * @author Markus Schütz / http://potree.org
  *
  */
+
+ //by duans
+Potree.ProtobufExporter = class ProtobufExporter 
+{
+	static PointString(point){
+		let stringPoint = 'points { \n';
+		stringPoint += '     x: ' + point.position.x.toString() +'\n';
+		stringPoint += '     y: ' + point.position.y.toString() +'\n';
+		stringPoint += '     z: ' + point.position.z.toString() +'\n';
+		stringPoint += '}\n';
+		return stringPoint;
+	}
+
+	static SectionToString (measurements)
+	{
+		let stringSection = 'sections { \n  id {\n   id: 0\n    name: "Section_ids"\n}\n';
+
+		for (let measurement of measurements){
+			let coords = measurement.points.map(e => e.position.toArray());
+			if(measurement.GeoType ===1){//RefLane重新添加一个Section
+				let stringrefLine = ' refline {\n   id{\n    id: 0\n    name: "refLane_Ids" \n  }\n';
+				stringrefLine += '    lines { \n ';
+				for(let pt of measurement.points){
+					let PtString = Potree.ProtobufExporter.PointString(pt);
+					stringrefLine += PtString;
+				}
+				stringrefLine += '\n     } \n    }'; //封闭lines  refline
+				stringSection += stringrefLine;
+			}else if(measurement.GeoType ===2){//RoadLane,紧随这RefLane
+				let stringRoadLine = ' lanes  {\n';
+				stringRoadLine += '    lines { \n ';
+				for(let pt of measurement.points){
+					let PtString = Potree.ProtobufExporter.PointString(pt);
+					stringRoadLine += PtString;
+				}
+				stringRoadLine += '\n     } \n    }'; //封闭lines  lanes
+				stringSection += stringRoadLine;
+			}else{ //其余输出元素 
+			}
+		}
+		stringSection += '\n }'; //封闭Section
+		return stringSection;
+	}
+
+	static toString (measurements)
+	{
+		if (!(measurements instanceof Array)){
+			measurements = [measurements];
+		}
+		measurements = measurements.filter(m => m instanceof Potree.Measure);
+		
+		//输出要素，Section+Other
+		let StrOutPutContent = "";
+		let StrOtherItemContent = "";
+		let vecHDSection = [];//第一个存放refLane,剩下的是RoadLane
+		for (let measure of measurements){
+			if(measure.GeoType ===1){//RefLane重新添加一个Section
+				if(vecHDSection.length>0){
+					//先输出再清空
+					let sectionStr = Potree.ProtobufExporter.SectionToString(vecHDSection);
+					StrOutPutContent += sectionStr;
+					vecHDSection.splice(0,vecHDSection.length);//清空
+				}
+				vecHDSection.push(measure);
+
+			}else if(measure.GeoType ===2){	//RoadLane,紧随这RefLane
+				vecHDSection.push(measure);
+
+			}else if(measure.GeoType >2){	//Map中其它元素
+				//measure
+			}
+		}
+		//最后一次的Section需要补充输出
+		if(vecHDSection.length>0){
+			//先输出再清空
+			let sectionStr = Potree.ProtobufExporter.SectionToString(vecHDSection);
+			StrOutPutContent += sectionStr;
+			vecHDSection.splice(0,vecHDSection.length);//清空
+		}
+
+		return StrOutPutContent;
+	}
+};
+
 
 Potree.GeoJSONExporter = class GeoJSONExporter {
 	static measurementToFeatures (measurement) {
@@ -18157,7 +18671,7 @@ Potree.Scene = class extends THREE.EventDispatcher{
 		
 		this.scene = new THREE.Scene();
 		this.sceneBG = new THREE.Scene();
-		this.scenePointCloud = new THREE.Scene();
+		this.scenePointCloud = new THREE.Scene(); //Scence只是容器，用来显示特定的元素
 
 		this.cameraP = new THREE.PerspectiveCamera(this.fov, 1, 0.1, 1000*1000);
 		this.cameraO = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 1000*1000);
@@ -18525,19 +19039,26 @@ Potree.Viewer = class PotreeViewer extends THREE.EventDispatcher{
 		this.edlStrength = 1.0;
 		this.edlRadius = 1.4;
 		this.useEDL = false;
+		//by duans
 		this.classifications = {
-			0: { visible: true, name: 'never classified' },
-			1: { visible: true, name: 'unclassified' },
-			2: { visible: true, name: 'ground' },
-			3: { visible: true, name: 'low vegetation' },
-			4: { visible: true, name: 'medium vegetation' },
-			5: { visible: true, name: 'high vegetation' },
-			6: { visible: true, name: 'building' },
-			7: { visible: true, name: 'low point(noise)' },
-			8: { visible: true, name: 'key-point' },
-			9: { visible: true, name: 'water' },
-			12: { visible: true, name: 'overlap' }
-		};
+			0: { visible: true, name: '0-道路-Road' },
+			1: { visible: true, name: '1-车道线-roadlane' },
+			2: { visible: true, name: '2-停止线-stopline' },
+			3: { visible: true, name: '3-斑马线-crosswalk' },
+			4: { visible: true, name: '4-地面箭头-roadarrow' },
+			5: { visible: true, name: '5-地面标志-lanemarking' },
+			6: { visible: true, name: '6-导流线-guideline' },
+			7: { visible: true, name: '7-减速带-speedbump' },
+			8: { visible: true, name: '8-标志牌-trafficsign' },
+			9: { visible: true, name: '9-指路牌-trafficboard' },
+			10: { visible: true, name: '10-红绿灯-trafficlight' },
+			11: { visible: true, name: '11-杆子-pole' },
+			12: { visible: true, name: '12-建筑-building' },
+			13: { visible: true, name: '13-人行道-sidewalk' },
+			14: { visible: true, name: '14-背景-background' },
+			15: { visible: true, name: '15-车辆行人-vehicle' },
+			16: { visible: true, name: '16-未知-Unknown' }
+		};	
 
 		this.moveSpeed = 10;
 
@@ -18979,6 +19500,7 @@ Potree.Viewer = class PotreeViewer extends THREE.EventDispatcher{
 		});
 	};
 
+	//设置点云类别是否显示
 	setClassificationVisibility (key, value) {
 		if (!this.classifications[key]) {
 			this.classifications[key] = {visible: value, name: 'no name'};
@@ -19315,7 +19837,7 @@ Potree.Viewer = class PotreeViewer extends THREE.EventDispatcher{
 		if (isVisible) {
 			renderArea.css('left', '0px');
 		} else {
-			renderArea.css('left', '300px');
+			renderArea.css('left', '250px'); // by duans  old 300--now 280
 		}
 	};
 
@@ -19342,19 +19864,22 @@ Potree.Viewer = class PotreeViewer extends THREE.EventDispatcher{
 
 		let viewer = this;
 		let sidebarContainer = $('#potree_sidebar_container');
-		sidebarContainer.load(new URL(Potree.scriptPath + '/sidebar.html').href, () => {
-			sidebarContainer.css('width', '300px');
-			sidebarContainer.css('height', '100%');
 
+		sidebarContainer.load(new URL(Potree.scriptPath + '/sidebar.html').href, () => {
+			sidebarContainer.css('width', '250px'); //by duans old 300  now 250
+			sidebarContainer.css('height', '100%'); //若设置50%，菜单栏下面空出，没有拓展到屏幕下边
+
+			//菜单栏的按钮，默认是显示的
 			let imgMenuToggle = document.createElement('img');
 			imgMenuToggle.src = new URL(Potree.resourcePath + '/icons/menu_button.svg').href;
-			imgMenuToggle.onclick = this.toggleSidebar;
-			imgMenuToggle.classList.add('potree_menu_toggle');
+			imgMenuToggle.onclick = this.toggleSidebar;  //图片按钮，控制左边菜单目录是否显示
+			imgMenuToggle.classList.add('potree_menu_toggle'); //classList.add  css里设置的效果
 
+			//地图按钮，有些Demo不显示
 			let imgMapToggle = document.createElement('img');
 			imgMapToggle.src = new URL(Potree.resourcePath + '/icons/map_icon.png').href;
-			imgMapToggle.style.display = 'none';
-			imgMapToggle.onclick = e => { this.toggleMap(); };
+			imgMapToggle.style.display = 'none'; //by duans  注释掉可以显示地图按钮
+			imgMapToggle.onclick = e => { this.toggleMap(); }; //按钮控制地图是否显示
 			imgMapToggle.id = 'potree_map_toggle';
 
 			viewer.renderArea.insertBefore(imgMapToggle, viewer.renderArea.children[0]);
@@ -19409,8 +19934,8 @@ Potree.Viewer = class PotreeViewer extends THREE.EventDispatcher{
 			});
 
 			
-		});
-	}
+		});  //sidebarContainer.load结束
+	} //LoadUI结束
 
 	setLanguage (lang) {
 		i18n.setLng(lang);
@@ -19643,7 +20168,7 @@ Potree.Viewer = class PotreeViewer extends THREE.EventDispatcher{
 					}
 					// pointcloud._intensityMaxEvaluated = true;
 				}
-			}
+			} 
 			
 			pointcloud.showBoundingBox = this.showBoundingBox;
 			pointcloud.generateDEM = this.generateDEM;
@@ -19698,6 +20223,7 @@ Potree.Viewer = class PotreeViewer extends THREE.EventDispatcher{
 			}
 		}
 
+		//用到的这个 by duans
 		if (!this.freeze) {
 			let result = Potree.updatePointClouds(scene.pointclouds, camera, this.renderer);
 
@@ -19788,7 +20314,7 @@ Potree.Viewer = class PotreeViewer extends THREE.EventDispatcher{
 			// volumes with clipping enabled
 			boxes.push(...this.scene.volumes.filter(v => v.clip));
 
-			// profile segments
+			// profile segments !by duans 2019.3.6 非常重要的地方
 			for(let profile of this.scene.profiles){
 				boxes.push(...profile.boxes);
 			}
@@ -20363,6 +20889,7 @@ Potree.ProfileWindow = class ProfileWindow extends THREE.EventDispatcher {
 				let mileage = this.scaleX.invert(newMouse.x);
 				let elevation = this.scaleY.invert(newMouse.y);
 
+				//by duans  在二维视图里找对应主视图的三维点
 				let point = this.selectPoint(mileage, elevation, radius);
 
 				if (point) {
@@ -21113,6 +21640,7 @@ Potree.MapView = class {
 		this.sourcesLabelLayer.setVisible(show);
 	}
 
+	//地图
 	init () {
 		this.elMap = $('#potree_map');
 		this.elMap.draggable({ handle: $('#potree_map_header') });
@@ -21745,35 +22273,14 @@ initSidebar = (viewer) => {
 		return element;
 	};
 
-	let measuringTool = new Potree.MeasuringTool(viewer);
-	let profileTool = new Potree.ProfileTool(viewer);
-	let volumeTool = new Potree.VolumeTool(viewer);
+	let measuringTool = new Potree.MeasuringTool(viewer);//量测工具
+	let profileTool = new Potree.ProfileTool(viewer); //平面工具,可用于
+	let volumeTool = new Potree.VolumeTool(viewer); //立体量测工具
 
+	// by duans 初始化工具条
 	function initToolbar () {
-
-		// ANGLE
 		let elToolbar = $('#tools');
-		elToolbar.append(createToolIcon(
-			Potree.resourcePath + '/icons/angle.png',
-			'[title]tt.angle_measurement',
-			function () {
-				$('#menu_measurements').next().slideDown();
-				let measurement = measuringTool.startInsertion({
-					showDistances: false,
-					showAngles: true,
-					showArea: false,
-					closed: true,
-					maxMarkers: 3,
-					name: 'Angle'});
-
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
-			}
-		));
-
-		// POINT
+		//AutoPlaneTool  GeoType==4
 		elToolbar.append(createToolIcon(
 			Potree.resourcePath + '/icons/point.svg',
 			'[title]tt.point_measurement',
@@ -21786,75 +22293,156 @@ initSidebar = (viewer) => {
 					showArea: false,
 					closed: true,
 					maxMarkers: 1,
-					name: 'Point'});
-
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
+					name: 'AutoPlane',
+					GeoType: 4 });
+				let measurementsRoot = $("#jstree_scene").jstree().get_json("HD_TrafficSign");
 				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
 				$.jstree.reference(jsonNode.id).deselect_all();
 				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
 			}
 		));
 
-		// DISTANCE
+		// POINT 点工具
 		elToolbar.append(createToolIcon(
-			Potree.resourcePath + '/icons/distance.svg',
-			'[title]tt.distance_measurement',
-			function () {
-				$('#menu_measurements').next().slideDown();
-				let measurement = measuringTool.startInsertion({
-					showDistances: true,
-					showArea: false,
-					closed: false,
-					name: 'Distance'});
-
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
-				$.jstree.reference(jsonNode.id).deselect_all();
-				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
-			}
-		));
-
-		// HEIGHT
-		elToolbar.append(createToolIcon(
-			Potree.resourcePath + '/icons/height.svg',
-			'[title]tt.height_measurement',
+			Potree.resourcePath + '/icons/point.svg',
+			'[title]tt.point_measurement',
 			function () {
 				$('#menu_measurements').next().slideDown();
 				let measurement = measuringTool.startInsertion({
 					showDistances: false,
-					showHeight: true,
+					showAngles: false,
+					showCoordinates: true,
 					showArea: false,
-					closed: false,
-					maxMarkers: 2,
-					name: 'Height'});
-
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
+					closed: true,
+					maxMarkers: 1,
+					name: 'Point',
+					GeoType: 0 });
+				let measurementsRoot = $("#jstree_scene").jstree().get_json("HD_Section");
 				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
 				$.jstree.reference(jsonNode.id).deselect_all();
 				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
 			}
 		));
 
-		// AREA
+		// DISTANCE  //refLane工具 改成了道路线工具
 		elToolbar.append(createToolIcon(
-			Potree.resourcePath + '/icons/area.svg',
-			'[title]tt.area_measurement',
+			Potree.resourcePath + '/icons/HDRefLine.svg',
+			'[title]tt.RefLane',
 			function () {
 				$('#menu_measurements').next().slideDown();
 				let measurement = measuringTool.startInsertion({
-					showDistances: true,
-					showArea: true,
-					closed: true,
-					name: 'Area'});
+					showDistances: false,
+					showArea: false,
+					closed: false,
+					name: 'RefLane',
+					GeoType: 1 }); //RefLine
 
-				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-				let jsonNode = measurementsRoot.children.find(child => child.data.uuid === measurement.uuid);
+				let RoadLaneRoot = $("#jstree_scene").jstree().get_json("HD_Section");
+				let jsonNode = RoadLaneRoot.children.find(child => child.data.uuid === measurement.uuid);
+				$.jstree.reference(jsonNode.id).deselect_all();
+				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+			}
+		));
+		// Lane工具 改成了道路线工具
+		elToolbar.append(createToolIcon(
+			Potree.resourcePath + '/icons/HDRoadLine.svg',
+			'[title]tt.RoadLane',
+			function () {
+				$('#menu_measurements').next().slideDown();
+				let measurement = measuringTool.startInsertion({
+					showDistances: false,
+					showArea: false,
+					closed: false,
+					name: 'Lane',
+					GeoType: 2 }); //普通道路线
+		
+				let RoadLaneRoot = $("#jstree_scene").jstree().get_json("HD_Section");
+				let jsonNode = RoadLaneRoot.children.find(child => child.data.uuid === measurement.uuid);
+				$.jstree.reference(jsonNode.id).deselect_all();
+				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+				}
+		));
+
+		// AREA  //停止线工具
+		elToolbar.append(createToolIcon(
+			Potree.resourcePath + '/icons/HDStopLine.svg',
+			'[title]tt.StopLine',
+			function () {
+				$('#menu_measurements').next().slideDown();
+				let measurement = measuringTool.startInsertion({
+					showDistances: false,
+					showArea: false,
+					closed: true,
+					name: 'stopLine',
+					GeoType: 3 });//停止线的面
+		
+				let RoadLaneRoot = $("#jstree_scene").jstree().get_json("HD_StopLine");
+				let jsonNode = RoadLaneRoot.children.find(child => child.data.uuid === measurement.uuid);
 				$.jstree.reference(jsonNode.id).deselect_all();
 				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
 			}
 		));
 
-		// VOLUME
+		// AREA  //指示牌工具
+		elToolbar.append(createToolIcon(
+			Potree.resourcePath + '/icons/HDTrafficSign.png',
+			'[title]tt.TrafficSign',
+			function () {
+				$('#menu_measurements').next().slideDown();
+				let measurement = measuringTool.startInsertion({
+					showDistances: false,
+					showArea: false,
+					closed: true,
+					name: 'TrafficSign',
+					GeoType: 4 });//停止线的面
+				
+				let RoadLaneRoot = $("#jstree_scene").jstree().get_json("HD_TrafficSign");
+				let jsonNode = RoadLaneRoot.children.find(child => child.data.uuid === measurement.uuid);
+				$.jstree.reference(jsonNode.id).deselect_all();
+				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+			}
+		));
+
+		// AREA  //红绿灯工具
+		elToolbar.append(createToolIcon(
+		Potree.resourcePath + '/icons/HDLight.png',
+		'[title]tt.Light',
+		function () {
+			$('#menu_measurements').next().slideDown();
+			let measurement = measuringTool.startInsertion({
+				showDistances: false,
+				showArea: false,
+				closed: true,
+				name: 'Light',
+				GeoType: 5 });//红绿灯的面
+						
+			let RoadLaneRoot = $("#jstree_scene").jstree().get_json("HD_Light");
+			let jsonNode = RoadLaneRoot.children.find(child => child.data.uuid === measurement.uuid);
+			$.jstree.reference(jsonNode.id).deselect_all();
+			$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+			}
+		));
+		//路面标识LaneMarking
+		elToolbar.append(createToolIcon(
+			Potree.resourcePath + '/icons/HDLaneMarking.png',
+			'[title]tt.LaneMarking',
+			function () {
+				$('#menu_measurements').next().slideDown();
+				let measurement = measuringTool.startInsertion({
+					showDistances: false,
+					showArea: false,
+					closed: true,
+					name: 'LaneMarking',
+					GeoType: 6 });//LaneMarking
+							
+				let RoadLaneRoot = $("#jstree_scene").jstree().get_json("HD_LaneMarking");
+				let jsonNode = RoadLaneRoot.children.find(child => child.data.uuid === measurement.uuid);
+				$.jstree.reference(jsonNode.id).deselect_all();
+				$.jstree.reference(jsonNode.id).select_node(jsonNode.id);
+			}
+		));
+
+		// VOLUME  //体积工具
 		elToolbar.append(createToolIcon(
 			Potree.resourcePath + '/icons/volume.svg',
 			'[title]tt.volume_measurement',
@@ -21868,12 +22456,12 @@ initSidebar = (viewer) => {
 			}
 		));
 
-		// PROFILE
+		// PROFILE  //平面工具
 		elToolbar.append(createToolIcon(
 			Potree.resourcePath + '/icons/profile.svg',
 			'[title]tt.height_profile',
 			function () {
-				$('#menu_measurements').next().slideDown(); ;
+				$('#menu_measurements').next().slideDown();
 				let profile = profileTool.startInsertion();
 
 				let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
@@ -21883,7 +22471,7 @@ initSidebar = (viewer) => {
 			}
 		));
 
-		// REMOVE ALL
+		// REMOVE ALL 移除所有量测的内容
 		elToolbar.append(createToolIcon(
 			Potree.resourcePath + '/icons/reset_tools.svg',
 			'[title]tt.remove_all_measurement',
@@ -21903,14 +22491,29 @@ initSidebar = (viewer) => {
 		{
 			let elExport = elScene.next().find("#scene_export");
 
+			let ProtobufIcon = `${Potree.resourcePath}/icons/file_Protobuf.png`;
 			let geoJSONIcon = `${Potree.resourcePath}/icons/file_geojson.svg`;
 			let dxfIcon = `${Potree.resourcePath}/icons/file_dxf.svg`;
+			
 
 			elExport.append(`
 				Export: <br>
+				<a href="#" download="measure.Protobuf"><img name="Protobuf_export_button" src="${ProtobufIcon}" class="button-icon" style="height: 24px" /></a>
 				<a href="#" download="measure.json"><img name="geojson_export_button" src="${geoJSONIcon}" class="button-icon" style="height: 24px" /></a>
 				<a href="#" download="measure.dxf"><img name="dxf_export_button" src="${dxfIcon}" class="button-icon" style="height: 24px" /></a>
 			`);
+
+			//by duans 添加了Protobuf的导出
+			let elDownloadProtobuf = elExport.find("img[name=Protobuf_export_button]").parent();
+			elDownloadProtobuf.click( () => {
+				let scene = viewer.scene;
+				let measurements = [...scene.measurements, ...scene.profiles, ...scene.volumes];
+				//修改Protobuf的输出
+				let ProtobufTest = Potree.ProtobufExporter.toString(measurements);
+
+				let url = window.URL.createObjectURL(new Blob([ProtobufTest], {type: 'data:application/octet-stream'}));
+				elDownloadProtobuf.attr('href', url);
+			});
 
 			let elDownloadJSON = elExport.find("img[name=geojson_export_button]").parent();
 			elDownloadJSON.click( () => {
@@ -21980,11 +22583,30 @@ initSidebar = (viewer) => {
 
 		let pcID = tree.jstree('create_node', "#", { "text": "<b>Point Clouds</b>", "id": "pointclouds"}, "last", false, false);
 		let measurementID = tree.jstree('create_node', "#", { "text": "<b>Measurements</b>", "id": "measurements" }, "last", false, false);
+
+		//by duans添加地图要素
+		let HD_SectionID = tree.jstree('create_node', "#", { "text": "<b>HD_Section</b>", "id": "HD_Section" }, "last", false, false);
+		let HD_StopLineID = tree.jstree('create_node', "#", { "text": "<b>HD_StopLine</b>", "id": "HD_StopLine" }, "last", false, false);
+		let HD_TrafficSignID = tree.jstree('create_node', "#", { "text": "<b>HD_TrafficSign</b>", "id": "HD_TrafficSign" }, "last", false, false);
+		let HD_LightID = tree.jstree('create_node', "#", { "text": "<b>HD_Light</b>", "id": "HD_Light" }, "last", false, false);
+		let HD_LaneMarkingID = tree.jstree('create_node', "#", { "text": "<b>HD_LaneMarking</b>", "id": "HD_LaneMarking" }, "last", false, false);
+		let HD_PoleID = tree.jstree('create_node', "#", { "text": "<b>HD_Pole</b>", "id": "HD_Pole" }, "last", false, false);
+		let HD_CrossWalkID = tree.jstree('create_node', "#", { "text": "<b>HD_CrossWalk</b>", "id": "HD_CrossWalk" }, "last", false, false);
+
 		let annotationsID = tree.jstree('create_node', "#", { "text": "<b>Annotations</b>", "id": "annotations" }, "last", false, false);
 		let otherID = tree.jstree('create_node', "#", { "text": "<b>Other</b>", "id": "other" }, "last", false, false);
 
 		tree.jstree("check_node", pcID);
 		tree.jstree("check_node", measurementID);
+		//HDMap要素
+		tree.jstree("check_node", HD_SectionID);
+		tree.jstree("check_node", HD_StopLineID);
+		tree.jstree("check_node", HD_TrafficSignID);
+		tree.jstree("check_node", HD_LightID);
+		tree.jstree("check_node", HD_LaneMarkingID);
+		tree.jstree("check_node", HD_PoleID);
+		tree.jstree("check_node", HD_CrossWalkID);
+
 		tree.jstree("check_node", annotationsID);
 		tree.jstree("check_node", otherID);
 
@@ -22013,6 +22635,7 @@ initSidebar = (viewer) => {
 			propertiesPanel.set(null);
 		});
 
+		//双击标注的要素，视图会放缩至要素位置
 		tree.on('dblclick','.jstree-anchor', function (e) {
 			let instance = $.jstree.reference(this);
 			let node = instance.get_node(this);
@@ -22117,7 +22740,8 @@ initSidebar = (viewer) => {
 		let onMeasurementAdded = (e) => {
 			let measurement = e.measurement;
 			let icon = Potree.getMeasurementIcon(measurement);
-			createNode(measurementID, measurement.name, icon, measurement);
+			let parentID = getParentID(measurement);
+			createNode(parentID, measurement.name, icon, measurement);
 		};
 
 		let onVolumeAdded = (e) => {
@@ -22159,10 +22783,51 @@ initSidebar = (viewer) => {
 		viewer.scene.addEventListener("polygon_clip_volume_added", onVolumeAdded);
 		viewer.scene.annotations.addEventListener("annotation_added", onAnnotationAdded);
 
+		//不同类型需要从不同目录中寻找 by duans
+		let getGeoType = (measurement) => {
+			if (measurement.GeoType === 0) {
+				return "measurements";//点类型
+			}else if (measurement.GeoType===1) { //refLine
+				return  "HD_Section";
+			} else if (measurement.GeoType===2) { //RoadLine
+				return "HD_Section";//面类型
+			} else if (measurement.GeoType===3) { //StopLine
+				return "HD_StopLine";//高度量测结果
+			} else if (measurement.GeoType===4) { //指示牌
+				return "HD_TrafficSign";
+			} else if (measurement.GeoType===5) { //红绿灯
+				return "HD_Light";
+			} else if (measurement.GeoType===6) { //laneMarking
+				return "HD_LaneMarking";
+			} else {
+				return TYPE.OTHER;
+			}
+		};
+		//不同类型需要从不同目录中寻找 by duans
+		let getParentID = (measurement) => {
+			if (measurement.GeoType === 0) {
+				return measurementID;//点类型
+			}else if (measurement.GeoType===1) { //refLine
+				return  HD_SectionID;
+			} else if (measurement.GeoType===2) { //RoadLine
+				return HD_SectionID;//面类型
+			} else if (measurement.GeoType===3) { //StopLine
+				return HD_StopLineID;//高度量测结果
+			} else if (measurement.GeoType===4) { //指示牌
+				return HD_TrafficSignID;
+			} else if (measurement.GeoType===5) { //红绿灯
+				return HD_LightID;
+			} else if (measurement.GeoType===6) { //路面标识 LaneMarking
+				return HD_LaneMarkingID;
+			} else {
+				return otherID;
+			}
+		};
+
 		let onMeasurementRemoved = (e) => {
-			let measurementsRoot = $("#jstree_scene").jstree().get_json("measurements");
-			let jsonNode = measurementsRoot.children.find(child => child.data.uuid === e.measurement.uuid);
-			
+			let GType = getGeoType(e.measurement); //获取
+			let measurementsRoot = $("#jstree_scene").jstree().get_json(GType);
+			let jsonNode = measurementsRoot.children.find(child => child.data.uuid === e.measurement.uuid);	
 			tree.jstree("delete_node", jsonNode.id);
 		};
 
@@ -22339,6 +23004,7 @@ initSidebar = (viewer) => {
 
 	}
 
+	//添加点云分类的控件
 	function initClassificationList () {
 		let elClassificationList = $('#classificationList');
 
@@ -22363,17 +23029,30 @@ initSidebar = (viewer) => {
 			elClassificationList.append(element);
 		};
 
-		addClassificationItem(0, 'never classified');
-		addClassificationItem(1, 'unclassified');
-		addClassificationItem(2, 'ground');
-		addClassificationItem(3, 'low vegetation');
-		addClassificationItem(4, 'medium vegetation');
-		addClassificationItem(5, 'high vegetation');
-		addClassificationItem(6, 'building');
-		addClassificationItem(7, 'low point(noise)');
-		addClassificationItem(8, 'key-point');
-		addClassificationItem(9, 'water');
-		addClassificationItem(12, 'overlap');
+		addClassificationItem(0, '0-道路-Road');
+		addClassificationItem(1, '1-车道线-roadlane');
+		addClassificationItem(2, '2-停止线-stopline');
+		addClassificationItem(3, '3-斑马线-crosswalk');
+		addClassificationItem(4, '4-地面箭头-roadarrow');
+		addClassificationItem(5, '5-地面标志-lanemarking');
+		addClassificationItem(6, '6-导流线-guideline');
+		addClassificationItem(7, '7-减速带-speedbump');
+		addClassificationItem(8, '8-标志牌-trafficsign');
+		addClassificationItem(9, '9-指路牌-trafficboard');
+		addClassificationItem(10, '10-红绿灯-trafficlight'); //'A'
+		addClassificationItem(11, '11-杆子-pole');			 //'B'
+		addClassificationItem(12, '12-建筑-building');		 //'C'
+		addClassificationItem(13, '13-人行道-sidewalk');	 //'D'
+		addClassificationItem(14, '14-背景-background');	//'E'
+		addClassificationItem(15, '15-车辆行人-vehicle');	 //'F'
+		addClassificationItem(16, '16-未知-Unknown');		//'G'
+		// addClassificationItem(65, '10-红绿灯-trafficlight'); //'A'
+		// addClassificationItem(66, '11-杆子-pole');			 //'B'
+		// addClassificationItem(67, '12-建筑-building');		 //'C'
+		// addClassificationItem(68, '13-人行道-sidewalk');	 //'D'
+		// addClassificationItem(69, '14-背景-background');	//'E'
+		// addClassificationItem(70, '15-车辆行人-vehicle');	 //'F'
+		// addClassificationItem(71, '16-未知-Unknown');		//'G'
 	}
 
 	function initAccordion () {
@@ -22398,6 +23077,7 @@ initSidebar = (viewer) => {
 			["JP", "jp"]
 		];
 
+		//设置4种颜色
 		let elLanguages = $('#potree_languages');
 		for(let i = 0; i < languages.length; i++){
 			let [key, value] = languages[i];
@@ -24042,16 +24722,20 @@ Potree.PropertiesPanel = class PropertriesPanel{
 
 		let getType = (measurement) => {
 			if (measurement instanceof Potree.Measure) {
-				if (measurement.showDistances && !measurement.showArea && !measurement.showAngles) {
-					return TYPE.DISTANCE;
-				} else if (measurement.showDistances && measurement.showArea && !measurement.showAngles) {
+			 	if (measurement.GeoType === 0) {
+					return TYPE.POINT;//点类型
+				 }else if (measurement.GeoType===1) { //refLine
+					return TYPE.DISTANCE;//线类型
+				} else if (measurement.GeoType===2) {//RoadLine
+					return TYPE.DISTANCE;//线类型
+				} else if (measurement.GeoType===3) { //停止线
 					return TYPE.AREA;
-				} else if (measurement.maxMarkers === 1) {
-					return TYPE.POINT;
-				} else if (!measurement.showDistances && !measurement.showArea && measurement.showAngles) {
-					return TYPE.ANGLE;
-				} else if (measurement.showHeight) {
-					return TYPE.HEIGHT;
+				} else if (measurement.GeoType===4) { //指示牌
+					return TYPE.AREA;
+				} else if (measurement.GeoType===5) { //指示牌
+					return TYPE.AREA;
+				} else if (measurement.GeoType===6) { //指示牌
+					return TYPE.AREA;
 				} else {
 					return TYPE.OTHER;
 				}
@@ -24063,7 +24747,6 @@ Potree.PropertiesPanel = class PropertriesPanel{
 		};
 
 		//this.container.html("measurement");
-
 		let type = getType(object);
 		let Panel = type.panel;
 

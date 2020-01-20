@@ -1,4 +1,4 @@
-
+//by duans 修改
 #include <chrono>
 #include <vector>
 #include <map>
@@ -34,7 +34,8 @@ using Potree::ConversionQuality;
 
 class SparseGrid;
 
-struct PotreeArguments {
+struct PotreeArguments 
+{
 	bool help = false;
 	StoreOption storeOption = StoreOption::ABORT_IF_EXISTS;
 	vector<string> source;
@@ -43,7 +44,7 @@ struct PotreeArguments {
 	int levels;
 	string format;
 	double scale;
-	int diagonalFraction;
+	int diagonalFraction;//分母，网格的大小
 	Potree::OutputFormat outFormat;
 	vector<double> colorRange;
 	vector<double> intensityRange;
@@ -68,9 +69,9 @@ struct PotreeArguments {
 	int flushLimit;
 };
 
-PotreeArguments parseArguments(int argc, char **argv){
+PotreeArguments parseArguments(int argc, char **argv)
+{
 	Arguments args(argc, argv);
-
 	args.addArgument("source,i,", "input files");
 	args.addArgument("help,h", "prints usage");
 	args.addArgument("generate-page,p", "Generates a ready to use web page with the given name.");
@@ -101,39 +102,23 @@ PotreeArguments parseArguments(int argc, char **argv){
 	args.addArgument("flush-limit", "Flush after X points. Default is 10000000");
 
 	PotreeArguments a;
+	a.executablePath = "/home/ds/01_code/05MyTest/PotreeConverter/Build/PotreeConverter/"; //存放html模板文件
+	//string strFile = "0_0.bin.ply";
+    //string strFile2 = "0_1.bin.ply";
+    //a.source.push_back(strFile);
+    //a.source.push_back(strFile2);
+    a.source.push_back("5_rings.ply");
 
-	a.executablePath = "home/ds/3rd/PotreeConverter/Build/PotreeConverter"; //存放html模板文件
-	string strFile = "20190220_112430_2_little.ply";
-	a.source.push_back(strFile);
 	cout << a.source.size() << endl;
 
-	if (args.has("help"))
-	{
-		cout << args.usage() << endl;
-		exit(0);
-	}
-	else if (!args.has("source") && !args.has("list-of-files")){
-		cout << args.usage() << endl;
-		//exit(1); // by duans
-	} else if (argc == 1) {
-		//cout << args.usage() << endl;// by duans
-		//exit(0);// by duans
-	}
-
-	if (args.has("incremental") && args.has("overwrite")) {
-		cout << "cannot have --incremental and --overwrite at the same time";
-		exit(1);
-	}
-
-	///a.source = args.get("source").as<vector<string>>();
 	a.generatePage = args.has("generate-page");
-	if (a.generatePage) {
+	if (a.generatePage) 
 		a.pageName = args.get("generate-page").as<string>();
-	}
+    
 	a.pageTemplate = args.has("page-template");
-	if (a.pageTemplate) {
+	if (a.pageTemplate) 
 		a.pageTemplatePath = args.get("page-template").as<string>();
-	}
+	
 	a.outdir = args.get("outdir").as<string>();
 	a.spacing = args.get("spacing").as<double>(0.0);
 	a.storeSize = args.get("store-size").as<int>(20'000);
@@ -144,86 +129,92 @@ PotreeArguments parseArguments(int argc, char **argv){
 	a.colorRange = args.get("color-range").as<vector<double>>();
 	a.intensityRange = args.get("intensity-range").as<vector<double>>();
 
-	if (args.has("output-format")) {
+	if (args.has("output-format"))
+    {
 		string of = args.get("output-format").as<string>("BINARY");
-
-		if (of == "BINARY") {
+		if (of == "BINARY") 
 			a.outFormat = Potree::OutputFormat::BINARY;
-		} else if (of == "LAS") {
+		 else if (of == "LAS") 
 			a.outFormat = Potree::OutputFormat::LAS;
-		} else if (of == "LAZ") {
+		 else if (of == "LAZ") 
 			a.outFormat = Potree::OutputFormat::LAZ;
-		} else {
+		 else 
 			a.outFormat = Potree::OutputFormat::BINARY;
-		}
-	} else {
+	}
+	else
 		a.outFormat = Potree::OutputFormat::BINARY;
-	}
 
-	if (args.has("output-attributes")) {
+	if (args.has("output-attributes")) 
 		a.outputAttributes = args.get("output-attributes").as<vector<string>>();
-	} else {
+	 else 
 		a.outputAttributes = { "RGB","CLASSIFICATION"}; //里面通常存储Label,Ply已经读取label至Classification by duans
-	}
 
 	a.scale = args.get("scale").as<double>(0.0);
 
-	if (args.has("aabb")) {
+	if (args.has("aabb"))
+    {
 		string strAABB = args.get("aabb").as<string>();
 		vector<double> aabbValues;
 		char sep = ' ';
 		for (size_t p = 0, q = 0; p != strAABB.npos; p = q)
 			aabbValues.push_back(atof(strAABB.substr(p + (p != 0), (q = strAABB.find(sep, p + 1)) - p - (p != 0)).c_str()));
 
-		if (aabbValues.size() != 6) {
+		if (aabbValues.size() != 6) 
+        {
 			cerr << "AABB requires 6 arguments" << endl;
 			exit(1);
 		}
-
 		a.aabbValues = aabbValues;
 	}
 
-	if(args.has("incremental")){
+	//若已经存在处理结果，如何处理
+	if(args.has("incremental")) //增加
 		a.storeOption = StoreOption::INCREMENTAL;
-	}else if(args.has("overwrite")){
+	else if(args.has("overwrite")) //覆盖
 		a.storeOption = StoreOption::OVERWRITE;
-	}else{
+	else if(args.has("abord"))//终止
 		a.storeOption = StoreOption::ABORT_IF_EXISTS;
-	}
+    else //默认覆盖
+        a.storeOption = StoreOption::OVERWRITE;//覆盖重新生成
 
 	a.sourceListingOnly = args.has("source-listing-only");
 	a.projection = args.get("projection").as<string>();
 
-	if (args.has("source")) {
-		//a.source = args.get("source").as<vector<string>>(); by duans
-	}
 	if (a.source.size() == 0 && args.has("list-of-files"))
 	{
 		string lof = args.get("list-of-files").as<string>();
 		a.listOfFiles = lof;
 
-		if (fs::exists(fs::path(a.listOfFiles))) {
+		if (fs::exists(fs::path(a.listOfFiles))) 
+        {
 			std::ifstream in(a.listOfFiles);
 			string line;
-			while (std::getline(in, line)) {
+			while (std::getline(in, line)) 
+            {
 				string path;
-				if (fs::path(line).is_absolute()) {
+				if (fs::path(line).is_absolute()) 
 					path = line;
-				} else {
+				else 
+                {
 					fs::path absPath = fs::canonical(fs::path(a.listOfFiles));
 					fs::path lofDir = absPath.parent_path();
 					path = lofDir.string() + "/" + line;
 				}
 
-				if (fs::exists(fs::path(path))) {
+				if (fs::exists(fs::path(path))) 
+                {
 					a.source.push_back(path);
-				} else {
+				} 
+				else 
+                {
 					cerr << "ERROR: file not found: " << path << endl;
 					exit(1);
 				}
 			}
 			in.close();
-		} else {
+		} 
+		else 
+        {
 			cerr << "ERROR: specified list of files not found: '" << a.listOfFiles << "'" << endl;
 			exit(1);
 		}
@@ -236,7 +227,8 @@ PotreeArguments parseArguments(int argc, char **argv){
 	a.material = args.get("material").as<string>("RGB");
 
 	vector<string> validMaterialNames = {"RGB", "ELEVATION", "INTENSITY", "INTENSITY_GRADIENT", "CLASSIFICATION", "RETURN_NUMBER", "SOURCE", "LEVEL_OF_DETAIL"};
-	if(std::find(validMaterialNames.begin(), validMaterialNames.end(), a.material) == validMaterialNames.end()){
+	if(std::find(validMaterialNames.begin(), validMaterialNames.end(), a.material) == validMaterialNames.end())
+    {
 		cout << args.usage();
 		cout << endl;
 		cout << "ERROR: " << "invalid material name specified" << endl;
@@ -247,106 +239,55 @@ PotreeArguments parseArguments(int argc, char **argv){
 	fs::path pSource(a.source[0]);
 	a.outdir = args.has("outdir") ? args.get("outdir").as<string>() : pSource.generic_string() + "_converted";
 
-	if (a.diagonalFraction != 0) {
+	if (a.diagonalFraction != 0) 
 		a.spacing = 0;
-	}else if(a.spacing == 0){
+	else if(a.spacing == 0)
 		a.diagonalFraction = 200;
-	}
 
-   try {
-    auto absolutePath = fs::canonical(fs::system_complete(argv[0]));
-    a.executablePath = absolutePath.parent_path().string();
-   } catch (const fs::filesystem_error &e) {
+   try 
+   {
+        auto absolutePath = fs::canonical(fs::system_complete(argv[0]));
+        a.executablePath = absolutePath.parent_path().string();
+   } 
+   catch (const fs::filesystem_error &e) 
+   {
      // do nothing
    }
-
-	return a;
+    return a;
 }
 
-void printArguments(PotreeArguments &a){
-	try{
-
-		cout << "== params ==" << endl;
-		int i = 0;
-		for(const auto &s : a.source) {
-			cout << "source[" << i << "]:         \t" << a.source[i] << endl;
-			++i;
-		}
-		cout << "outdir:            \t" << a.outdir << endl;
-		cout << "spacing:           \t" << a.spacing << endl;
-		cout << "diagonal-fraction: \t" << a.diagonalFraction << endl;
-		cout << "levels:            \t" << a.levels << endl;
-		cout << "format:            \t" << a.format << endl;
-		cout << "scale:             \t" << a.scale << endl;
-		cout << "pageName:          \t" << a.pageName << endl;
-		cout << "projection:        \t" << a.projection << endl;
-		cout << endl;
-	}catch(exception &e){
-		cout << "ERROR: " << e.what() << endl;
-
-		exit(1);
-	}
+//打印参数
+void printArguments(PotreeArguments &a)
+{
+    cout << "== params ==" << endl;
+    int i = 0;
+    for(const auto &s : a.source)
+    {
+        cout << "source[" << i << "]:         \t" << a.source[i] << endl;
+        ++i;
+    }
+    cout << "outdir:            \t" << a.outdir << endl;
+    cout << "spacing:           \t" << a.spacing << endl;
+    cout << "diagonal-fraction: \t" << a.diagonalFraction << endl;
+    cout << "levels:            \t" << a.levels << endl;
+    cout << "format:            \t" << a.format << endl;
+    cout << "scale:             \t" << a.scale << endl;
+    cout << "pageName:          \t" << a.pageName << endl;
+    cout << "projection:        \t" << a.projection << endl;
+    cout << endl;
 }
 
 #include "Vector3.h"
 #include <random>
 
-
-int main_HHHH(int argc, char **argv)
-{
-	cout.imbue(std::locale(""));
-
-	try{
-		PotreeArguments a = parseArguments(argc, argv);
-		printArguments(a);
-
-        PotreeConverter pc(a.executablePath, a.outdir, a.source);
-
-		pc.spacing = a.spacing;
-		pc.diagonalFraction = a.diagonalFraction;
-		pc.maxDepth = a.levels;
-		pc.format = a.format;
-		pc.colorRange = a.colorRange;
-		pc.intensityRange = a.intensityRange;
-		pc.scale = a.scale;
-		pc.outputFormat = a.outFormat;
-		pc.outputAttributes = a.outputAttributes;
-		pc.aabbValues = a.aabbValues;
-		pc.pageName = a.pageName;
-		pc.pageTemplatePath = a.pageTemplatePath;
-		pc.storeOption = a.storeOption;
-		pc.projection = a.projection;
-		pc.sourceListingOnly = a.sourceListingOnly;
-		pc.quality = a.conversionQuality;
-		pc.title = a.title;
-		pc.description = a.description;
-		pc.edlEnabled = a.edlEnabled;
-		pc.material = a.material;
-		pc.showSkybox = a.showSkybox;
-		pc.storeSize = a.storeSize;
-		pc.flushLimit = a.flushLimit;
-
-		pc.convert();
-	}catch(exception &e){
-		cout << "ERROR: " << e.what() << endl;
-		return 1;
-	}
-
-	return 0;
-}
-
 //by duans
 int main(int argc, char **argv)
 {
 	cout.imbue(std::locale(""));
-
 	try{
+        
 		PotreeArguments a  = parseArguments(argc, argv);
 		printArguments(a);
-
-		if(a.source.size()<1)
-			a.source.push_back("split0001.las");
-		//"home/ds/3rdPart/PotreeConverter/Build/PotreeConverter/split0001.las"
 
         PotreeConverter pc(a.executablePath, a.outdir, a.source);
 		pc.spacing = a.spacing;
@@ -374,7 +315,9 @@ int main(int argc, char **argv)
 		pc.flushLimit = a.flushLimit;
 
 		pc.convert();
-	}catch(exception &e){
+	}
+	catch(exception &e)
+    {
 		cout << "ERROR: " << e.what() << endl;
 		return 1;
 	}

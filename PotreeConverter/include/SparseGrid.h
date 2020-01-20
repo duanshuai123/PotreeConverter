@@ -22,7 +22,8 @@ namespace Potree{
 
 #define MAX_FLOAT std::numeric_limits<float>::max()
 //稀疏的网格
-class SparseGrid : public unordered_map<long long, GridCell*>{
+class SparseGrid : public unordered_map<long long, GridCell*>
+{
 public:
 	int width;
 	int height;
@@ -35,8 +36,7 @@ public:
 
 	SparseGrid(const SparseGrid &other)
 		: width(other.width), height(other.height), depth(other.depth), aabb(other.aabb), squaredSpacing(other.squaredSpacing), numAccepted(other.numAccepted)
-	{
-	}
+	{}
 
 	~SparseGrid();
 
@@ -51,7 +51,6 @@ public:
 	bool add(Vector3<double> &p);
 
 	void addWithoutCheck(Vector3<double> &p);
-
 };
 
 }

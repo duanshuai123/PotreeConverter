@@ -1,7 +1,5 @@
 
-
 #include <experimental/filesystem>
-
 #include "rapidjson/document.h"
 #include "rapidjson/prettywriter.h"
 #include "rapidjson/stringbuffer.h"
@@ -25,9 +23,6 @@
 #include <vector>
 #include <math.h>
 #include <fstream>
-
-
-
 
 using rapidjson::Document;
 using rapidjson::StringBuffer;
@@ -74,8 +69,8 @@ PointReader *PotreeConverter::createPointReader(string path, PointAttributes poi
 
 		if(this->intensityRange.size() == 0)
 		{
-				intensityRange.push_back(-2048);
-				intensityRange.push_back(+2047);
+            intensityRange.push_back(-2048);
+            intensityRange.push_back(+2047);
 		}
 
 		reader = new XYZPointReader(path, format, colorRange, intensityRange);
@@ -88,7 +83,8 @@ PointReader *PotreeConverter::createPointReader(string path, PointAttributes poi
 	return reader;
 }
 
-PotreeConverter::PotreeConverter(string executablePath, string workDir, vector<string> sources){
+PotreeConverter::PotreeConverter(string executablePath, string workDir, vector<string> sources)
+{
     this->executablePath = executablePath;
 	this->workDir = workDir;
 	this->sources = sources;
@@ -197,14 +193,15 @@ AABB PotreeConverter::calculateAABB()
 	return aabb;
 }
 
-void PotreeConverter::generatePage(string name){
-
+void PotreeConverter::generatePage(string name)
+{
 	string pagedir = this->workDir;
     string templateSourcePath = this->executablePath + "/resources/page_template/viewer_template.html";
     string mapTemplateSourcePath = this->executablePath + "/resources/page_template/lasmap_template.html";
     string templateDir = this->executablePath + "/resources/page_template";
 
-        if(!this->pageTemplatePath.empty()) {
+    if(!this->pageTemplatePath.empty())
+    {
 		templateSourcePath = this->pageTemplatePath + "/viewer_template.html";
 		mapTemplateSourcePath = this->pageTemplatePath + "/lasmap_template.html";
 		templateDir = this->pageTemplatePath;
@@ -217,13 +214,16 @@ void PotreeConverter::generatePage(string name){
 	fs::remove(pagedir + "/viewer_template.html");
 	fs::remove(pagedir + "/lasmap_template.html");
 
-	if(!this->sourceListingOnly){ // change viewer template
+	if(!this->sourceListingOnly)// change viewer template
+    { 
 		ifstream in( templateSourcePath );
 		ofstream out( templateTargetPath );
 
 		string line;
-		while(getline(in, line)){
-			if(line.find("<!-- INCLUDE POINTCLOUD -->") != string::npos){
+		while(getline(in, line))
+        {
+			if(line.find("<!-- INCLUDE POINTCLOUD -->") != string::npos)
+            {
 				out << "\t\tPotree.loadPointCloud(\"pointclouds/" << name << "/cloud.js\", \"" << name << "\", e => {" << endl;
 				out << "\t\t\tlet pointcloud = e.pointcloud;\n";
 				out << "\t\t\tlet material = pointcloud.material;\n";
@@ -237,7 +237,9 @@ void PotreeConverter::generatePage(string name){
 
 				out << "\t\t\tviewer.fitToScreen();" << endl;
 				out << "\t\t});" << endl;
-			}else if(line.find("<!-- INCLUDE SETTINGS HERE -->") != string::npos){
+			}
+			else if(line.find("<!-- INCLUDE SETTINGS HERE -->") != string::npos)
+            {
 				out << std::boolalpha;
 				out << "\t\t" << "document.title = \"" << title << "\";\n";
 				out << "\t\t" << "viewer.setEDLEnabled(" << edlEnabled << ");\n";
@@ -251,26 +253,31 @@ void PotreeConverter::generatePage(string name){
 				std::replace(descriptionEscaped.begin(), descriptionEscaped.end(), '`', '\'');
 
 				out << "\t\t" << "viewer.setDescription(`" << descriptionEscaped << "`);\n";
-			}else{
+			}
+			else
+            {
 				out << line << endl;
 			}
-
 		}
-
 		in.close();
 		out.close();
 	}
 
 	// change lasmap template
-	if(!this->projection.empty()){
+	if(!this->projection.empty())
+    {
 		ifstream in( mapTemplateSourcePath );
 		ofstream out( mapTemplateTargetPath );
 
 		string line;
-		while(getline(in, line)){
-			if(line.find("<!-- INCLUDE SOURCE -->") != string::npos){
+		while(getline(in, line))
+        {
+			if(line.find("<!-- INCLUDE SOURCE -->") != string::npos)
+            {
 				out << "\tvar source = \"" << "pointclouds/" << name << "/sources.json" << "\";";
-			}else{
+			}
+			else
+            {
 				out << line << endl;
 			}
 
@@ -289,7 +296,6 @@ void writeSources(string path, vector<string> sourceFilenames, vector<int> numPo
 	AABB bb;
 
 	Value jProjection(projection.c_str(), (rapidjson::SizeType)projection.size());
-
 	Value jSources(rapidjson::kObjectType);
 	jSources.SetArray();
 
@@ -356,11 +362,11 @@ void writeSources(string path, vector<string> sourceFilenames, vector<int> numPo
 	d.AddMember("sources", jSources, d.GetAllocator());
 
 	StringBuffer buffer;
-	//PrettyWriter<StringBuffer> writer(buffer);
 	Writer<StringBuffer> writer(buffer);
 	d.Accept(writer);
 
-	if(!fs::exists(fs::path(path))){
+	if(!fs::exists(fs::path(path)))
+    {
 		fs::path pcdir(path);
 		fs::create_directories(pcdir);
 	}
@@ -393,7 +399,7 @@ void PotreeConverter::convert()
 
 	//根据模板产生并修改HTML文件 by duans 默认outResult
 	if(pageName.size() < 1)
-		pageName = "outResult";
+		pageName = "index";
 
 	generatePage(pageName);
 	workDir = workDir + "/pointclouds/" + pageName;
@@ -522,7 +528,6 @@ void PotreeConverter::convert()
 
 	auto end = high_resolution_clock::now();
 	long long duration = duration_cast<milliseconds>(end-start).count();
-
 
 	cout << endl;
 	cout << "conversion finished" << endl;

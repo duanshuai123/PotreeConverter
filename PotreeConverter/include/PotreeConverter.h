@@ -19,14 +19,14 @@ namespace Potree{
 
 class SparseGrid;
 
-class PotreeConverter{
-
+class PotreeConverter
+{
 private:
 	AABB aabb;
 	vector<string> sources;
 	string workDir;
 	CloudJS cloudjs;
-	PointAttributes pointAttributes;
+	PointAttributes pointAttributes; //待输出的属性字段（位置、法向量、颜色以及自定义）
 
 	PointReader *createPointReader(string source, PointAttributes pointAttributes);
 	void prepare();
@@ -60,9 +60,7 @@ public:
 	int flushLimit = 10'000'000;
 
     PotreeConverter(string executablePath, string workDir, vector<string> sources);
-		
 	void convert();
-
 };
 
 }
